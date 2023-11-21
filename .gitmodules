@@ -1,0 +1,3 @@
+[submodule "pyblaze"]
+	path = pyblaze
+	url = https://github.com/Cortys/pyblaze.git

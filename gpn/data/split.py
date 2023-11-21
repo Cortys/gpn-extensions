@@ -147,9 +147,9 @@ def get_idx_split(
     assert len(set(train_indices) - set(test_indices)) == len(set(train_indices))
     assert len(set(val_indices) - set(test_indices)) == len(set(val_indices))
 
-    data.train_mask = index_to_mask(train_indices, num_nodes)
-    data.test_mask = index_to_mask(test_indices, num_nodes)
-    data.val_mask = index_to_mask(val_indices, num_nodes)
+    data.train_mask = index_to_mask(torch.from_numpy(train_indices), num_nodes)
+    data.test_mask = index_to_mask(torch.from_numpy(test_indices), num_nodes)
+    data.val_mask = index_to_mask(torch.from_numpy(val_indices), num_nodes)
 
     if len(dropped_classes) > 0:
         data.dropped_classes = torch.LongTensor(dropped_classes)
