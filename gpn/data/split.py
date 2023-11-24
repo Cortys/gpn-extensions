@@ -1,14 +1,16 @@
-from typing import Union, Optional, List
+from typing import Any, Iterable
 from torch import Tensor
-from torch_geometric.data import Dataset
+from torch_geometric.data import InMemoryDataset
+import ogb.nodeproppred as ogbn
 
 import torch
 import numpy as np
+from numpy.typing import NDArray
 
 from torch_geometric.io.planetoid import index_to_mask
 
 
-def get_idx_split_arxiv(dataset: Dataset) -> Dataset:
+def get_idx_split_arxiv(dataset: ogbn.PygNodePropPredDataset) -> ogbn.PygNodePropPredDataset:
     """create dataset split for the ogbn-arxiv dataset compatible with our pipeline
 
     Args:
@@ -18,31 +20,37 @@ def get_idx_split_arxiv(dataset: Dataset) -> Dataset:
         Dataset: modified dataset
     """
 
-    split_idx = dataset.get_idx_split()
-    train_idx, valid_idx, test_idx = split_idx["train"], split_idx["valid"], split_idx["test"]
+    split_idx: dict[str, Tensor] = dataset.get_idx_split() # type: ignore
+    train_idx, valid_idx, test_idx = (
+        split_idx["train"],
+        split_idx["valid"],
+        split_idx["test"],
+    )
 
-    num_nodes = dataset.data.y.size(0)
-    dataset.data.train_mask = index_to_mask(train_idx, num_nodes)
-    dataset.data.val_mask = index_to_mask(valid_idx, num_nodes)
-    dataset.data.test_mask = index_to_mask(test_idx, num_nodes)
+    data: Any = dataset._data
+    num_nodes = data.y.size(0)
+    data.train_mask = index_to_mask(train_idx, num_nodes)
+    data.val_mask = index_to_mask(valid_idx, num_nodes)
+    data.test_mask = index_to_mask(test_idx, num_nodes)
 
     return dataset
 
 
 def get_idx_split(
-        dataset: Dataset,
-        split: str = 'random',
-        train_samples_per_class: Union[int, float] = None,
-        val_samples_per_class: Union[int, float] = None,
-        test_samples_per_class: Union[int, float] = None,
-        train_size: Optional[int] = None,
-        val_size: Optional[int] = None,
-        test_size: Optional[int] = None) -> Dataset:
+    dataset: InMemoryDataset,
+    split: str = "random",
+    train_samples_per_class: int | float | None = None,
+    val_samples_per_class: int | float | None = None,
+    test_samples_per_class: int | float | None = None,
+    train_size: int | None = None,
+    val_size: int | None = None,
+    test_size: int | None = None,
+) -> InMemoryDataset:
     """utility function for creating train/test/val split for a dataset.
 
     The split is either created by specifying the number or fraction of samples per class or the overall size
     the training/validation/test set. If the fraction of samples per class is chosen, the fraction is relative
-    to the number of labeled data points for each class separately. 
+    to the number of labeled data points for each class separately.
 
     code taken partially from (https://github.com/shchur/gnn-benchmark)
 
@@ -60,15 +68,18 @@ def get_idx_split(
         Dataset: modified dataset object containing the dataset split
     """
 
-    data = dataset.data
+    data: Any = dataset._data
 
     assert (train_size is None) ^ (train_samples_per_class is None)
     assert (val_size is None) ^ (val_samples_per_class is None)
     assert (test_size is None) ^ (test_samples_per_class is None)
 
-    if split == 'public':
-        assert hasattr(data, 'train_mask') and hasattr(data, 'test_mask') \
-            and hasattr(data, 'test_mask')
+    if split == "public":
+        assert (
+            hasattr(data, "train_mask")
+            and hasattr(data, "test_mask")
+            and hasattr(data, "test_mask")
+        )
         return dataset
 
     labels = data.y
@@ -89,7 +100,9 @@ def get_idx_split(
         _test_samples_per_class = test_samples_per_class
 
     forbidden_indices = None
-    min_samples_per_class = _train_samples_per_class + _val_samples_per_class + _test_samples_per_class
+    min_samples_per_class = (
+        _train_samples_per_class + _val_samples_per_class + _test_samples_per_class
+    )
 
     if min_samples_per_class > 0:
         dropped_classes = []
@@ -111,8 +124,13 @@ def get_idx_split(
 
     # train indices
     if train_samples_per_class is not None:
-        train_indices = sample_per_class(labels, num_nodes, classes,
-                                         train_samples_per_class, forbidden_indices=forbidden_indices)
+        train_indices = sample_per_class(
+            labels,
+            num_nodes,
+            classes,
+            train_samples_per_class,
+            forbidden_indices=forbidden_indices,
+        )
     else:
         remaining_indices = np.setdiff1d(remaining_indices, forbidden_indices)
         train_indices = np.random.choice(remaining_indices, train_size, replace=False)
@@ -120,8 +138,13 @@ def get_idx_split(
     # validation indices (exclude train indices)
     forbidden_indices = np.concatenate((forbidden_indices, train_indices))
     if val_samples_per_class is not None:
-        val_indices = sample_per_class(labels, num_nodes, classes,
-                                       val_samples_per_class, forbidden_indices=train_indices)
+        val_indices = sample_per_class(
+            labels,
+            num_nodes,
+            classes,
+            val_samples_per_class,
+            forbidden_indices=train_indices,
+        )
     else:
         remaining_indices = np.setdiff1d(remaining_indices, forbidden_indices)
         val_indices = np.random.choice(remaining_indices, val_size, replace=False)
@@ -129,9 +152,13 @@ def get_idx_split(
     # test indices (exclude test indices)
     forbidden_indices = np.concatenate((forbidden_indices, val_indices))
     if test_samples_per_class is not None:
-        test_indices = sample_per_class(labels, num_nodes, classes,
-                                        test_samples_per_class,
-                                        forbidden_indices=forbidden_indices)
+        test_indices = sample_per_class(
+            labels,
+            num_nodes,
+            classes,
+            test_samples_per_class,
+            forbidden_indices=forbidden_indices,
+        )
     elif test_size is not None:
         remaining_indices = np.setdiff1d(remaining_indices, forbidden_indices)
         test_indices = np.random.choice(remaining_indices, test_size, replace=False)
@@ -157,15 +184,19 @@ def get_idx_split(
     return dataset
 
 
-def sample_per_class(labels: Tensor, num_nodes: int, classes: List[int],
-                     samples_per_class: Union[int, float],
-                     forbidden_indices: np.array = None) -> np.array:
+def sample_per_class(
+    labels: Tensor,
+    num_nodes: int,
+    classes: list[int],
+    samples_per_class: int | float,
+    forbidden_indices: Iterable | None = None,
+) -> NDArray:
     """samples a subset of indices based on specified number of samples per class
 
     Args:
         labels (Tensor): tensor of ground-truth labels
         num_nodes (int): number nof nodes
-        classes (List[int]): classes (labels) for which the subset is sampled
+        classes (list[int]): classes (labels) for which the subset is sampled
         samples_per_class (Union[int, float]): number or fraction of samples per class
         forbidden_indices (np.array, optional): indices to ignore for sampling. Defaults to None.
 
@@ -174,7 +205,7 @@ def sample_per_class(labels: Tensor, num_nodes: int, classes: List[int],
     """
 
     sample_indices_per_class = {index: [] for index in classes}
-    num_samples_per_class = {index: None for index in classes}
+    num_samples_per_class = {index: -1 for index in classes}
 
     # get indices sorted by class
     for class_index in classes:
@@ -186,12 +217,20 @@ def sample_per_class(labels: Tensor, num_nodes: int, classes: List[int],
     for class_index in classes:
         if isinstance(samples_per_class, float):
             class_labels = sample_indices_per_class[class_index]
-            num_samples_per_class[class_index] = int(samples_per_class * len(class_labels))
+            num_samples_per_class[class_index] = int(
+                samples_per_class * len(class_labels)
+            )
         else:
             num_samples_per_class[class_index] = samples_per_class
 
     # get specified number of indices for each class
     return np.concatenate(
-        [np.random.choice(sample_indices_per_class[class_index], num_samples_per_class[class_index], replace=False)
-         for class_index in classes
-        ])
+        [
+            np.random.choice(
+                sample_indices_per_class[class_index],
+                num_samples_per_class[class_index],
+                replace=False,
+            )
+            for class_index in classes
+        ]
+    )

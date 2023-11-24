@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "gpn"
+name = "cuq-gnn"
 version = "0.1.0"
 description = ""
 authors = ["Clemens Damke <damke@kiml.ifi.lmu.de>"]
@@ -51,6 +51,7 @@ priority = "explicit"
 ipykernel = "^6.27.0"
 notebook = "^7.0.6"
 ipywidgets = "^8.1.1"
+pyright = "^1.1.337"
 
 [build-system]
 requires = ["poetry-core"]

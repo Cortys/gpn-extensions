@@ -1,4 +1,5 @@
 import copy
+from typing import Callable
 import torch
 import torch_geometric.data as td
 from torch_geometric.loader import DataLoader
@@ -13,7 +14,7 @@ class InMemoryDatasetProvider(td.InMemoryDataset):
     Wrapper for a torch_geometric dataset which makes it compatible to our pipeline intended for usage with different OOD datasets.
     """
 
-    def __init__(self, dataset):
+    def __init__(self, dataset: td.InMemoryDataset):
         super().__init__()
 
         self.data_list = list(dataset)
@@ -27,7 +28,7 @@ class InMemoryDatasetProvider(td.InMemoryDataset):
     def num_classes(self):
         return self._num_classes
 
-    def set_num_classes(self, n_c):
+    def set_num_classes(self, n_c: int):
         self._num_classes = n_c
 
     @property
@@ -91,6 +92,8 @@ class OODInMemoryDatasetProvider(InMemoryDatasetProvider):
 
         else:
             raise AssertionError
+        
+        n_c = 0
 
         for i, d in enumerate(self.data_list):
 
@@ -119,8 +122,8 @@ class OODIsolatedInMemoryDatasetProvider(InMemoryDatasetProvider):
         assert len(tg_dataset) == 1
         super().__init__(tg_dataset)
 
-        self.perturbation = None
-        self.perturbation_kwargs = None
+        self.perturbation: Callable = None # type: ignore
+        self.perturbation_kwargs: dict = None # type: ignore
 
         NUM_NODES_ISOLATED = 100
 

@@ -106,7 +106,7 @@ def get_ood_split(
 
     class_mapping = {c:i for i, c in enumerate(classes)}
 
-    left_out = torch.zeros_like(data.y, dtype=bool)
+    left_out = torch.zeros_like(data.y, dtype=torch.bool)
     for c in left_out_classes:
         left_out = left_out | (data.y == c)
 
@@ -152,7 +152,7 @@ def get_ood_split_evasion(data, **ood_kwargs):
 
     ood_data, num_classes = get_ood_split(data, **ood_kwargs)
     id_nodes = ood_data.id_mask
-    id_edge_index, _ = tu.subgraph(
+    id_edge_index, _ = tu.subgraph( # type: ignore
         id_nodes, ood_data.edge_index,
         relabel_nodes=True)
     id_data = ood_data.clone()
@@ -352,7 +352,7 @@ def perturb_features(
 
     data.x[ind_perturbed] = ood_noise_scale * noise
 
-    ood_mask = torch.zeros_like(data.y, dtype=bool)
+    ood_mask = torch.zeros_like(data.y, dtype=torch.bool)
     ood_mask[ind_perturbed] = True
     id_mask = ~ood_mask
 
@@ -524,7 +524,7 @@ def random_attack_targeted(
         data.edge_index = edge_index
 
     # define ID / OOD masks for nodes
-    ood_mask = torch.zeros_like(data.y, dtype=bool)
+    ood_mask = torch.zeros_like(data.y, dtype=torch.bool)
     ood_mask[ind_perturbed] = True
     id_mask = ~ood_mask
     data.ood_mask = ood_mask
@@ -550,7 +550,7 @@ def random_attack_targeted(
     # define masks for edges
     num_kept_edges = edge_index.size(1)
 
-    id_edges = torch.zeros(data.edge_index.size(1), device=data.y.device, dtype=bool)
+    id_edges = torch.zeros(data.edge_index.size(1), device=data.y.device, dtype=torch.bool)
     id_edges[0:num_kept_edges] = True
     ood_edges = ~id_edges
 
@@ -629,7 +629,7 @@ def random_attack_dice(data, ood_budget_per_graph=0.1, **_):
             inserted_end.append(cross_community_nodes[i])
 
     # finalize kept and new edges
-    kept = torch.ones_like(start, dtype=bool)
+    kept = torch.ones_like(start, dtype=torch.bool)
     kept[deleted_edges] = False
     kept_start = start[kept]
     kept_end = start[kept]
@@ -653,7 +653,7 @@ def random_attack_dice(data, ood_budget_per_graph=0.1, **_):
 
     # for compatibility with pipeline: masks for nodes
     # define ID / OOD masks for nodes
-    ood_mask = torch.zeros_like(data.y, dtype=bool)
+    ood_mask = torch.zeros_like(data.y, dtype=torch.bool)
     id_mask = ~ood_mask
     data.ood_mask = ood_mask
     data.id_mask = id_mask
@@ -678,7 +678,7 @@ def random_attack_dice(data, ood_budget_per_graph=0.1, **_):
     # define masks for edges
     num_kept_edges = edge_index.size(1)
 
-    id_edges = torch.zeros(data.edge_index.size(1), device=data.y.device, dtype=bool)
+    id_edges = torch.zeros(data.edge_index.size(1), device=data.y.device, dtype=torch.bool)
     id_edges[0:num_kept_edges] = True
     ood_edges = ~id_edges
 
@@ -718,7 +718,7 @@ def random_edge_perturbations(data, ood_budget_per_graph=0.1, **_):
 
     # for compatibility with pipeline: masks for nodes
     # define ID / OOD masks for nodes
-    ood_mask = torch.zeros_like(data.y, dtype=bool)
+    ood_mask = torch.zeros_like(data.y, dtype=torch.bool)
     id_mask = ~ood_mask
     data.ood_mask = ood_mask
     data.id_mask = id_mask
@@ -741,7 +741,7 @@ def random_edge_perturbations(data, ood_budget_per_graph=0.1, **_):
         data.id_test_mask = id_mask & data.test_mask
 
     # define masks for edges
-    id_edges = torch.ones(data.edge_index.size(1), device=data.y.device, dtype=bool)
+    id_edges = torch.ones(data.edge_index.size(1), device=data.y.device, dtype=torch.bool)
     id_edges[edge_indices] = False
     ood_edges = ~id_edges
 
