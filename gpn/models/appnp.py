@@ -22,16 +22,17 @@ class APPNP(Model):
             num_layers = params.num_layers
 
         if num_layers > 1:
-            dim_hidden = [params.dim_hidden] * (num_layers - 1)
+            dim_hidden: list[int] = [params.dim_hidden] * (num_layers - 1)  # type: ignore
         else:
-            dim_hidden = params.dim_hidden
+            dim_hidden: list[int] | int = params.dim_hidden
 
         self.linear = LinearSequentialLayer(
             params.dim_features,
             dim_hidden,
             params.num_classes,
             batch_norm=params.batch_norm,
-            dropout_prob=params.dropout_prob)
+            dropout_prob=params.dropout_prob,
+        )
 
         self.propagation = tnn.APPNP(
             K=params.K,
@@ -58,7 +59,6 @@ class APPNP(Model):
             prediction_confidence_aleatoric=max_soft,
             prediction_confidence_epistemic=None,
             prediction_confidence_structure=None,
-
             # confidence of sample
             sample_confidence_aleatoric=max_soft,
             sample_confidence_epistemic=None,
@@ -73,8 +73,12 @@ class APPNP(Model):
         if data.edge_index is not None:
             edge_index = data.edge_index
             if self.params.dropout_prob_adj > 0:
-                edge_index, _ = dropout_adj(edge_index, p=self.params.dropout_prob_adj,
-                                            force_undirected=False, training=self.training)
+                edge_index, _ = dropout_adj(
+                    edge_index,
+                    p=self.params.dropout_prob_adj,
+                    force_undirected=False,
+                    training=self.training,
+                )
         else:
             edge_index = data.adj_t
         h = self.linear(data.x)

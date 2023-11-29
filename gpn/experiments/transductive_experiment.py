@@ -35,7 +35,6 @@ class TransductiveExperiment:
         self.train_cfg = train_cfg
 
         self.model = None
-        self.dataset = None
         self.ex = ex
 
         # metrics for evaluation of default graph
@@ -185,7 +184,8 @@ class TransductiveExperiment:
 
         return results
 
-    def train(self)-> History:
+    def train(self)-> History | None:
+        assert self.model is not None
         if not self.model.expects_training():
             return None
 
@@ -298,6 +298,7 @@ class TransductiveExperiment:
         # or potential values to be cached
         # e.g. alpha_prior of y_soft
         if self.run_cfg.save_model:
+            assert self.model is not None
             self.model.save_to_storage()
 
         return results

@@ -6,14 +6,19 @@ from pyblaze.nn.callbacks import EarlyStopping, CallbackException
 class AverageEarlyStopping(EarlyStopping):
     """early stopping based on metric averages"""
 
-    def __init__(self, metric='val_loss', patience=10, restore_best=True, minimize=True):
+    def __init__(
+        self, metric="val_loss", patience=10, restore_best=True, minimize=True
+    ):
         super().__init__(metric, patience, restore_best, minimize)
         self.metric_history = []
 
     def after_epoch(self, metrics):
+        assert self.epoch is not None
         prev_epoch = self.epoch
         self.epoch += 1
 
+        is_better = False
+        
         try:
             is_better = self._is_metric_better(metrics)
         except KeyError:
@@ -24,24 +29,28 @@ class AverageEarlyStopping(EarlyStopping):
 
         if is_better:
             if self.restore_best:
+                assert self.model is not None
                 self.state_dict = copy.deepcopy(self.model.state_dict())
             self.counter = 0
         else:
             # metric is only better when window met, i.e. return immediately
             raise CallbackException(
                 f"Early stopping after epoch {self.epoch} (patience {self.patience}).",
-                verbose=True
+                verbose=True,
             )
-    
+
     # current metric is better if epoch < patience or better than average window
-    def _is_metric_better(self, metrics):
+    def _is_metric_better(self, metrics) -> bool:
+        assert self.epoch is not None
         self._current_metric(metrics)
         if self.minimize:
             return self.epoch < self.patience or self.metric_history[-1] < np.mean(
-                self.metric_history[-(self.patience + 1):-1])
+                self.metric_history[-(self.patience + 1) : -1]
+            )
         else:
             return self.epoch < self.patience or self.metric_history[-1] > np.mean(
-                self.metric_history[-(self.patience + 1):-1])          
+                self.metric_history[-(self.patience + 1) : -1]
+            )
 
     # simply append current metric to history
     def _current_metric(self, metrics):
@@ -52,9 +61,13 @@ class AverageEarlyStopping(EarlyStopping):
 class MultipleMetricEarlyStopping(EarlyStopping):
     """early stopping considering multiple metrics"""
 
-    def __init__(self, metric=('val_loss', 'val_acc'), patience=10,
-                 restore_best=True, minimize=(True, False)):
-
+    def __init__(
+        self,
+        metric=("val_loss", "val_acc"),
+        patience=10,
+        restore_best=True,
+        minimize=(True, False),
+    ):
         if isinstance(metric, str):
             metric = [metric]
         if isinstance(minimize, bool):
@@ -65,20 +78,22 @@ class MultipleMetricEarlyStopping(EarlyStopping):
         assert len(metric) == len(minimize)
         self._is_better = [None] * len(metric)
 
-        super().__init__(metric, patience, restore_best, minimize)
-       
+        super().__init__(metric, patience, restore_best, minimize) # type: ignore
+
     def before_training(self, model, num_epochs):
         self.model = model
         if self.restore_best:
             self.state_dict = copy.deepcopy(model.state_dict())
         self.epoch = 0
         self.counter = 0
-        self.best_metric = [float('inf') if m else -float('inf') for m in self.minimize]
+        self.best_metric = [float("inf") if m else -float("inf") for m in self.minimize] # type: ignore
 
     def after_epoch(self, metrics):
         prev_epoch = self.epoch
         self.epoch += 1
         current_metrics = self._current_metric(metrics)
+        
+        is_better = False
 
         try:
             is_better = self._is_metric_better(current_metrics)
@@ -98,14 +113,15 @@ class MultipleMetricEarlyStopping(EarlyStopping):
             if self.counter == self.patience:
                 raise CallbackException(
                     f"Early stopping after epoch {self.epoch} (patience {self.patience}).",
-                    verbose=True)
+                    verbose=True,
+                )
 
     def _current_metric(self, metrics):
         return [metrics[m] for m in self.metric]
-    
+
     def _is_metric_better(self, current_metrics):
         for i, m in enumerate(current_metrics):
-            if self.minimize[i]:
+            if self.minimize[i]: # type: ignore
                 self._is_better[i] = m < self.best_metric[i]
             else:
                 self._is_better[i] = m > self.best_metric[i]
@@ -114,7 +130,7 @@ class MultipleMetricEarlyStopping(EarlyStopping):
 
     def _best_metric(self, current_metrics):
         for i, m in enumerate(current_metrics):
-            if self.minimize[i]:
+            if self.minimize[i]: # type: ignore
                 self.best_metric[i] = np.min((self.best_metric[i], m))
             else:
                 self.best_metric[i] = np.max((self.best_metric[i], m))

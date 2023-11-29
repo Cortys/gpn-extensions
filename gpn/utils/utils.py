@@ -85,7 +85,7 @@ def _apply_mask(y_hat: Union[dict, Tensor, Prediction], mask: Tensor) -> Union[d
         _y_hat = __apply(y_hat, mask)
 
     elif isinstance(y_hat, Prediction):
-        y_hat_dict = _apply_mask(y_hat.to_dict(), mask)
+        y_hat_dict: dict[str, Any] = _apply_mask(y_hat.to_dict(), mask) # type: ignore
         _y_hat = Prediction(**y_hat_dict)
 
     else:
@@ -135,7 +135,7 @@ def apply_mask(data: Data, y_hat: Union[dict, Tensor, Prediction], split: str,
     elif split == 'ood_train':
         # not intended as mask
         # for not breaking pipeline: empty mask
-        mask = torch.zeros_like(data.y, dtype=bool)
+        mask = torch.zeros_like(data.y, dtype=torch.bool)
 
     elif split == 'id_val':
         mask = data.id_val_mask
@@ -146,7 +146,7 @@ def apply_mask(data: Data, y_hat: Union[dict, Tensor, Prediction], split: str,
     elif split == 'id_train':
         # not intended as mask
         # for not breaking pipeline: empty mask
-        mask = torch.zeros_like(data.y, dtype=bool)
+        mask = torch.zeros_like(data.y, dtype=torch.bool)
 
     else:
         raise NotImplementedError(f'split {split} is not implemented!')
@@ -178,13 +178,12 @@ def to_one_hot(targets: Tensor, num_classes: int) -> Tensor:
     return soft_output
 
 
-def recursive_update(d: dict, u: dict):
+def recursive_update(d: dict, u: collections.abc.Mapping):
     """recursively update a dictionary d with might contain nested sub-dictionarieswith values from u"""
     
     for k, v in u.items():
         if isinstance(v, collections.abc.Mapping):
             d[k] = recursive_update(d[k], v)
-
         else:
             d[k] = v
 

@@ -42,7 +42,7 @@ class RunConfiguration(HalfFrozenObject):
     log: bool = attr.ib(default=True) # flag for logging training progress and metrics
     debug: bool = attr.ib(default=True) # flag for running code in a "DEBUG" mode
     ex_type: str = attr.ib(default='transductive', validator=lambda i, a, v: v in (
-        'transductive', 'transductive_ood'))
+        'transductive', 'transductive_ood')) # type: ignore
 
     ood_loc: bool = attr.ib(default=True) # flag for running LOC in ood_experiment
     ood_loc_only: bool = attr.ib(default=False) # flag for only runninig LOC in ood_experiment
@@ -80,7 +80,7 @@ class DataConfiguration(HalfFrozenObject):
     ood_type: str = attr.ib(default=None, validator=lambda i, a, v: v in (
         None, 'perturb_features', 'leave_out_classes',
         'leave_out_classes_evasion', 'random_attack_dice', 'random_attack_targeted', 'random_edge_perturbations'))
-    ood_dataset_type: str = attr.ib(None, validator=lambda i, a, v: v in ('budget', 'isolated', None))
+    ood_dataset_type: str = attr.ib(default=None, validator=lambda i, a, v: v in ('budget', 'isolated', None))
     # type of feature perturabtion, e.g. bernoulli_0.5
     ood_perturbation_type: str = attr.ib(default=None)
     ood_budget_per_graph: float = attr.ib(default=None)

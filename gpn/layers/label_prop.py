@@ -36,10 +36,10 @@ class LabelPropagation(MessagePassing):
             out[mask] = y[mask]
 
         if isinstance(edge_index, SparseTensor) and not edge_index.has_value():
-            edge_index = gcn_norm(edge_index, add_self_loops=False)
+            edge_index = gcn_norm(edge_index, add_self_loops=False) # type: ignore
         elif isinstance(edge_index, Tensor) and edge_weight is None:
             edge_index, edge_weight = gcn_norm(edge_index, num_nodes=y.size(0),
-                                               add_self_loops=False)
+                                               add_self_loops=False) # type: ignore
 
         res = (1 - self.alpha) * out
         for _ in range(self.num_layers):
@@ -56,7 +56,7 @@ class LabelPropagation(MessagePassing):
         return x_j if edge_weight is None else edge_weight.view(-1, 1) * x_j
 
     def message_and_aggregate(self, adj_t: SparseTensor, x: Tensor) -> Tensor:
-        return matmul(adj_t, x, reduce=self.aggr)
+        return matmul(adj_t, x, reduce=self.aggr) # type: ignore
 
     def __repr__(self):
         return '{}(num_layers={}, alpha={})'.format(self.__class__.__name__,

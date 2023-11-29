@@ -19,7 +19,7 @@ def sample_weight(mu: torch.Tensor, rho: torch.Tensor) -> torch.Tensor:
     return mu + eps * sigma
 
 
-def gaussian_log_prob(w: torch.Tensor, mu: torch.Tensor, sigma: torch.Tensor) -> torch.Tensor:
+def gaussian_log_prob(w: torch.Tensor, mu: torch.Tensor | float, sigma: torch.Tensor) -> torch.Tensor:
     """calculates (log) probability of weights w based on mean mu and variance sigma of a gaussian"""
 
     log_prob = -0.5 * math.log(2 * math.pi) \
@@ -39,11 +39,11 @@ def gaussian_posterior_log_prob(w: torch.Tensor, mu: torch.Tensor, rho: torch.Te
 def gaussian_mixture_log_prob(w: torch.Tensor, pi: float, sigma_1: float, sigma_2: float) -> torch.Tensor:
     """calculates (log) probability of a mixture of two gaussian with variances sigma_1 and sigma_2 and pi being the mixture coefficient"""
 
-    sigma_1 = torch.FloatTensor([sigma_1]).to(w.device)
-    sigma_2 = torch.FloatTensor([sigma_2]).to(w.device)
+    sigma_1_t = torch.FloatTensor([sigma_1]).to(w.device)
+    sigma_2_t = torch.FloatTensor([sigma_2]).to(w.device)
 
-    prob_1 = gaussian_log_prob(w, 0.0, sigma_1).exp()
-    prob_2 = gaussian_log_prob(w, 0.0, sigma_2).exp()
+    prob_1 = gaussian_log_prob(w, 0.0, sigma_1_t).exp()
+    prob_2 = gaussian_log_prob(w, 0.0, sigma_2_t).exp()
 
     return torch.log(pi * prob_1 + (1 - pi) * prob_2 + 1.0e-10).mean()
 

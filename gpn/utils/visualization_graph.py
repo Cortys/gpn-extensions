@@ -10,7 +10,7 @@ from sklearn.manifold import TSNE
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 
-import torch_geometric
+import torch_geometric.data
 from torch_geometric.utils import to_networkx
 import plotly.graph_objects as go
 
@@ -21,7 +21,7 @@ def visualize_graph_embeddings(
         data: torch_geometric.data.Data, 
         x: torch.Tensor, 
         labels: torch.Tensor,
-        embedding: Optional[np.array] = None,
+        embedding: np.ndarray | None = None,
         colorscale: str = 'YlGnBu', 
         save_image: bool = False, 
         base_path: str = '', 
@@ -131,7 +131,7 @@ def visualize_graph_embeddings(
             showlegend=False
         )
 
-        node_trace.marker.color = node_labels
+        node_trace.marker.color = node_labels # type: ignore
         node_trace.text = node_text
 
         traces = [edge_trace, node_trace]

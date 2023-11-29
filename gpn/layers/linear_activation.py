@@ -13,7 +13,7 @@ class LinearActivation(nn.Module):
             output_dim: int,
             dropout_prob: Optional[float] = None,
             k_lipschitz: Optional[float] = None,
-            activation: nn.Module = nn.ReLU(),
+            activation: nn.Module | None = nn.ReLU(),
             bias: bool = True):
 
         super().__init__()

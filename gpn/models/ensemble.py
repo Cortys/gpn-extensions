@@ -14,7 +14,7 @@ class Ensemble(Model):
     aggregating predictions and allowing for parallel training
     """
 
-    def __init__(self, params: ModelConfiguration, models: List[Model]):
+    def __init__(self, params: ModelConfiguration, models: List[Model] | None):
         super().__init__(params)
 
         self.models = nn.ModuleList(models)
@@ -66,7 +66,7 @@ class Ensemble(Model):
         raise NotImplementedError
 
     def load_from_storage(self) -> None:
-        if self.storage is None:
+        if self.storage is None or self.storage_params is None:
             raise RuntimeError('Error on loading model, storage does not exist!')
 
         path = self.storage.retrieve_model_dir_path(self.params.model_name, self.storage_params)

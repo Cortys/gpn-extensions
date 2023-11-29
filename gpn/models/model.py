@@ -1,4 +1,5 @@
-from typing import Dict
+from typing import Any, Dict
+from pyblaze.nn.callbacks.tracking import TensorboardTracker
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -26,7 +27,7 @@ class Model(nn.Module):
             self.params = params.clone()
 
         self.storage = None
-        self.storage_params = None
+        self.storage_params: dict[str, Any] | None = None
         self.model_file_path = None
         self.cached_y = None
 
@@ -94,8 +95,8 @@ class Model(nn.Module):
         raise NotImplementedError
 
     def CE_loss(self, prediction: Prediction, data: Data, reduction='mean') -> Dict[str, torch.Tensor]:
-        y_hat = prediction.log_soft
-        y_hat, y = apply_mask(data, y_hat, split='train')
+        y_hat: torch.Tensor = prediction.log_soft
+        y_hat, y: torch.Tensor = apply_mask(data, y_hat, split='train') # type: ignore
 
         return {
             'CE': F.nll_loss(y_hat, y, reduction=reduction)
@@ -128,7 +129,7 @@ class Model(nn.Module):
 
     def create_storage(self, run_cfg: RunConfiguration, data_cfg: DataConfiguration,
                        model_cfg: ModelConfiguration, train_cfg: TrainingConfiguration,
-                       ex: Experiment = None):
+                       ex: Experiment | None = None):
 
         if run_cfg.job == 'train' or (run_cfg.job == 'evaluate' and run_cfg.eval_experiment_name is None):
             run_cfg.set_values(eval_experiment_name=run_cfg.experiment_name)
@@ -148,7 +149,7 @@ class Model(nn.Module):
         self.storage_params = storage_params
 
     def load_from_storage(self) -> None:
-        if self.storage is None:
+        if self.storage is None or self.storage_params is None:
             raise ModelNotFoundError('Error on loading model, storage does not exist!')
 
         model_file_path = self.storage.retrieve_model_file_path(
@@ -158,7 +159,7 @@ class Model(nn.Module):
         self.load_from_file(model_file_path)
 
     def save_to_storage(self) -> None:
-        if self.storage is None:
+        if self.storage is None or self.storage_params is None:
             raise ModelNotFoundError('Error on storing model, storage does not exist!')
 
         model_file_path = self.storage.create_model_file_path(

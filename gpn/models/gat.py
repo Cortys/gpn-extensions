@@ -10,16 +10,17 @@ class GAT(Model):
     """GAT model"""
 
     def __init__(self, params: ModelConfiguration):
-
         super().__init__(params)
+        assert isinstance(self.params.dim_hidden, int)
 
         self.input = nn.Dropout(p=self.params.dropout_prob)
         self.conv1 = GATConv(
-            self.params.dim_features, 
-            self.params.dim_hidden, 
+            self.params.dim_features,
+            self.params.dim_hidden,
             heads=self.params.heads_conv1,
-            dropout=self.params.coefficient_dropout_prob, 
-            negative_slope=self.params.negative_slope)
+            dropout=self.params.coefficient_dropout_prob,
+            negative_slope=self.params.negative_slope,
+        )
 
         activation = []
 
@@ -32,9 +33,10 @@ class GAT(Model):
             self.params.dim_hidden * self.params.heads_conv1,
             self.params.num_classes,
             heads=self.params.heads_conv2,
-            concat=False, 
+            concat=False,
             dropout=self.params.coefficient_dropout_prob,
-            negative_slope=self.params.negative_slope)
+            negative_slope=self.params.negative_slope,
+        )
 
     def forward_impl(self, data: Data) -> Tensor:
         x = self.input(data.x)

@@ -32,10 +32,10 @@ def degree(edge_index: Tensor, direction='out', num_nodes=None, edge_weight=None
             device=edge_index.device)
 
     if direction == 'out':
-        return scatter_add(edge_weight, row, dim=0, dim_size=num_nodes)
+        return scatter_add(edge_weight, row, dim=0, dim_size=num_nodes) # type: ignore
 
     elif direction == 'in':
-        return scatter_add(edge_weight, col, dim=0, dim_size=num_nodes)
+        return scatter_add(edge_weight, col, dim=0, dim_size=num_nodes) # type: ignore
 
     else:
         raise AssertionError

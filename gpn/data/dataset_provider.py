@@ -17,7 +17,7 @@ class InMemoryDatasetProvider(td.InMemoryDataset):
     def __init__(self, dataset: td.InMemoryDataset):
         super().__init__()
 
-        self.data_list = list(dataset)
+        self.data_list = list(dataset) # type: ignore
         self._num_classes = dataset.num_classes
         self._num_features = dataset.num_features
         self._to_sparse = ToSparseTensor(
@@ -93,7 +93,7 @@ class OODInMemoryDatasetProvider(InMemoryDatasetProvider):
         else:
             raise AssertionError
         
-        n_c = 0
+        n_c = None
 
         for i, d in enumerate(self.data_list):
 
@@ -101,7 +101,8 @@ class OODInMemoryDatasetProvider(InMemoryDatasetProvider):
 
             self.data_list[i] = d_p
 
-        if 'leave_out_classes' in ood_type:
+        if 'leave_out_classes' == ood_type:
+            assert isinstance(n_c, int)
             self.set_num_classes(n_c)
 
 

@@ -1,8 +1,9 @@
-from typing import Optional, List, Any
+from typing import Callable, Optional, List, Any, Tuple
 import torch
 import torch.nn as nn
 from torch import Tensor
 import torch_geometric.utils as tu
+import torch_geometric.utils.num_nodes as tunn
 from torch_geometric.typing import Adj
 from torch_geometric.nn import MessagePassing
 from torch_scatter import scatter_add
@@ -10,16 +11,19 @@ from torch_sparse import SparseTensor, fill_diag, mul, sum
 
 
 def propagation_wrapper(
-        propagation: callable, x: Tensor, edge_index: Adj,
-        unc_node_weight: Optional[Tensor] = None,
-        unc_edge_weight: Optional[Tensor] = None,
-        node_normalization: str = 'none',
-        return_normalizer: bool = False,
-        **kwargs) -> Tensor:
+    propagation: Callable,
+    x: Tensor,
+    edge_index: Adj,
+    unc_node_weight: Optional[Tensor] = None,
+    unc_edge_weight: Optional[Tensor] = None,
+    node_normalization: str = "none",
+    return_normalizer: bool = False,
+    **kwargs
+) -> Tensor | Tuple[Tensor, Tensor | None]:
     """wraps default propagation layer with the option of weighting edges or nodes additionally
 
     Args:
-        propagation (callable): original propagation method
+        propagation (Callable): original propagation method
         x (Tensor): node features
         edge_index (Adj): edges
         unc_node_weight (Optional[Tensor], optional): additional weight of nodes. Defaults to None.
@@ -34,8 +38,8 @@ def propagation_wrapper(
         Tensor: node features after propagation
     """
 
-    kwargs.setdefault('edge_weight', None)
-    edge_weight = kwargs['edge_weight']
+    kwargs.setdefault("edge_weight", None)
+    edge_weight = kwargs["edge_weight"]
 
     if unc_node_weight is None:
         unc_node_weight = torch.ones_like(x[:, 0]).view(-1, 1)
@@ -52,26 +56,28 @@ def propagation_wrapper(
 
     # unc_edge_weight is not None
     else:
-        unc_edge_weight = unc_edge_weight if edge_weight is None else edge_weight * unc_edge_weight
+        unc_edge_weight = (
+            unc_edge_weight if edge_weight is None else edge_weight * unc_edge_weight
+        )
 
         # diffuse 1 with previous weighting
         dif_ones = propagation(ones, edge_index=edge_index, **kwargs)
 
         # diffuse x, w with new weighting
-        kwargs['edge_weight'] = unc_edge_weight
+        kwargs["edge_weight"] = unc_edge_weight
         x = torch.cat([unc_node_weight * x, unc_node_weight], dim=-1)
         x = propagation(x, edge_index=edge_index, **kwargs)
         dif_w = x[:, -1].view(-1, 1)
         dif_x = x[:, 0:-1]
 
-    if node_normalization in ('reweight_and_scale', None):
+    if node_normalization in ("reweight_and_scale", None):
         # sum_u c_vu * (sum_u c_vu * w_u * x_u) / (sum_u c_vu * w_u)
         x = dif_ones * dif_x / dif_w
 
-    elif node_normalization == 'reweight':
+    elif node_normalization == "reweight":
         x = dif_x / dif_w
 
-    elif node_normalization == 'none':
+    elif node_normalization == "none":
         dif_w = None
         x = dif_x
 
@@ -83,9 +89,15 @@ def propagation_wrapper(
     return x
 
 
-def mat_norm(edge_index: Adj, edge_weight: Optional[Tensor] = None, num_nodes: Optional[int] = None,
-             add_self_loops: bool = True, dtype: Optional[Any] = None,
-             normalization: str = 'sym', **kwargs) -> Adj:
+def mat_norm(
+    edge_index: Adj,
+    edge_weight: Optional[Tensor] = None,
+    num_nodes: Optional[int] = None,
+    add_self_loops: bool = True,
+    dtype: Optional[Any] = None,
+    normalization: str = "sym",
+    **kwargs
+) -> Adj | Tuple[Tensor, Tensor]:
     """computes normalization of adjanceny matrix
 
     Args:
@@ -103,27 +115,45 @@ def mat_norm(edge_index: Adj, edge_weight: Optional[Tensor] = None, num_nodes: O
         Adj: normalized adjacency matrix
     """
 
-    if normalization in ('sym', 'gcn'):
+    if normalization in ("sym", "gcn"):
         return gcn_norm(
-            edge_index, edge_weight=edge_weight, num_nodes=num_nodes,
-            add_self_loops=add_self_loops, dtype=dtype, **kwargs)
+            edge_index,
+            edge_weight=edge_weight,
+            num_nodes=num_nodes,
+            add_self_loops=add_self_loops,
+            dtype=dtype,
+            **kwargs
+        )
 
-    if normalization in ('in-degree', 'out-degree', 'rw'):
+    if normalization in ("in-degree", "out-degree", "rw"):
         return deg_norm(
-            edge_index, edge_weight=edge_weight, num_nodes=num_nodes,
-            add_self_loops=add_self_loops, dtype=dtype)
+            edge_index,
+            edge_weight=edge_weight,
+            num_nodes=num_nodes,
+            add_self_loops=add_self_loops,
+            dtype=dtype,
+        )
 
-    if normalization in ('in-degree-sym', 'sym-var'):
+    if normalization in ("in-degree-sym", "sym-var"):
         return inv_norm(
-            edge_index, edge_weight=edge_weight, num_nodes=num_nodes,
-            add_self_loops=add_self_loops, dtype=dtype)
+            edge_index,
+            edge_weight=edge_weight,
+            num_nodes=num_nodes,
+            add_self_loops=add_self_loops,
+            dtype=dtype,
+        )
 
     raise AssertionError
 
 
-def deg_norm(edge_index: Adj, edge_weight: Optional[Tensor] = None, num_nodes: Optional[int] = None,
-             add_self_loops: bool = True, dtype: Optional[Any] = None,
-             normalization: str = 'in-degree') -> Adj:
+def deg_norm(
+    edge_index: Adj,
+    edge_weight: Optional[Tensor] = None,
+    num_nodes: Optional[int] = None,
+    add_self_loops: bool = True,
+    dtype: Optional[Any] = None,
+    normalization: str = "in-degree",
+) -> Adj | Tuple[Tensor, Tensor]:
     """degree normalization
 
     Args:
@@ -144,56 +174,59 @@ def deg_norm(edge_index: Adj, edge_weight: Optional[Tensor] = None, num_nodes: O
     fill_value = 1.0
 
     if isinstance(edge_index, SparseTensor):
-        adj_t = edge_index
+        adj_t: SparseTensor = edge_index
         if not adj_t.has_value():
-            adj_t = adj_t.fill_value(1., dtype=dtype)
+            adj_t = adj_t.fill_value(1.0, dtype=dtype)  # type: ignore
         if add_self_loops:
             adj_t = fill_diag(adj_t, fill_value)
 
-        if normalization == 'in-degree':
-
+        if normalization == "in-degree":
             in_deg = sum(adj_t, dim=0)
             in_deg_inv_sqrt = in_deg.pow_(-0.5)
-            in_deg_inv_sqrt.masked_fill_(in_deg_inv_sqrt == float('inf'), 0.)
+            in_deg_inv_sqrt.masked_fill_(in_deg_inv_sqrt == float("inf"), 0.0)
             # A = D_in^-1 * A
             adj_t = mul(adj_t, in_deg_inv_sqrt.view(1, -1))
 
-        elif normalization in ('out-degree', 'rw'):
+        elif normalization in ("out-degree", "rw"):
             out_deg = sum(adj_t, dim=1)
             out_deg_inv_sqrt = out_deg.pow_(-0.5)
-            out_deg_inv_sqrt.masked_fill_(out_deg_inv_sqrt == float('inf'), 0.)
+            out_deg_inv_sqrt.masked_fill_(out_deg_inv_sqrt == float("inf"), 0.0)
             # A = A * D_out^-1
             adj_t = mul(adj_t, out_deg_inv_sqrt.view(-1, 1))
 
         else:
             raise AssertionError
 
-        return adj_t
+        return adj_t  # type: ignore
 
-    num_nodes = tu.num_nodes.maybe_num_nodes(edge_index, num_nodes)
+    assert isinstance(edge_index, Tensor)
+
+    num_nodes = tunn.maybe_num_nodes(edge_index, num_nodes)  # type: ignore
 
     if edge_weight is None:
         edge_weight = torch.ones(
-            (edge_index.size(1), ),
-            dtype=dtype,
-            device=edge_index.device)
+            (edge_index.size(1),), dtype=dtype, device=edge_index.device
+        )
 
     if add_self_loops:
         edge_index, edge_weight = tu.add_remaining_self_loops(
-            edge_index, edge_weight, fill_value, num_nodes)
+            edge_index, edge_weight, fill_value, num_nodes
+        )
 
     row, col = edge_index[0], edge_index[1]
 
-    if normalization == 'in-degree':
+    assert edge_weight is not None
+
+    if normalization == "in-degree":
         in_deg = scatter_add(edge_weight, col, dim=0, dim_size=num_nodes)
         in_deg_inv = 1.0 / in_deg
-        in_deg_inv.masked_fill_(in_deg_inv == float('inf'), 0)
+        in_deg_inv.masked_fill_(in_deg_inv == float("inf"), 0)
         edge_weight = in_deg_inv[col] * edge_weight
 
-    elif normalization in ('out-degree', 'rw'):
+    elif normalization in ("out-degree", "rw"):
         out_deg = scatter_add(edge_weight, row, dim=0, dim_size=num_nodes)
         out_deg_inv = 1.0 / out_deg
-        out_deg_inv.masked_fill_(out_deg_inv == float('inf'), 0)
+        out_deg_inv.masked_fill_(out_deg_inv == float("inf"), 0)
         edge_weight = out_deg_inv[row] * edge_weight
 
     else:
@@ -202,8 +235,14 @@ def deg_norm(edge_index: Adj, edge_weight: Optional[Tensor] = None, num_nodes: O
     return edge_index, edge_weight
 
 
-def gcn_norm(edge_index: Adj, edge_weight: Optional[Tensor] = None, num_nodes: Optional[int] = None,
-             improved: bool = False, add_self_loops: bool = True, dtype: Optional[Any] = None) -> Adj:
+def gcn_norm(
+    edge_index: Adj,
+    edge_weight: Optional[Tensor] = None,
+    num_nodes: Optional[int] = None,
+    improved: bool = False,
+    add_self_loops: bool = True,
+    dtype: Optional[Any] = None,
+) -> Adj | Tuple[Tensor, Tensor]:
     """gcn-like normalization of adjacency matrix
 
     Args:
@@ -218,39 +257,42 @@ def gcn_norm(edge_index: Adj, edge_weight: Optional[Tensor] = None, num_nodes: O
         Adj: normalized adjacency matrix
     """
 
-
-    fill_value = 2. if improved else 1.
+    fill_value = 2.0 if improved else 1.0
 
     if isinstance(edge_index, SparseTensor):
         adj_t = edge_index
         if not adj_t.has_value():
-            adj_t = adj_t.fill_value(1., dtype=dtype)
+            adj_t = adj_t.fill_value(1.0, dtype=dtype)
         if add_self_loops:
-            adj_t = fill_diag(adj_t, fill_value)
+            adj_t = fill_diag(adj_t, fill_value) # type: ignore
 
-        in_deg = sum(adj_t, dim=1)
-        #out_deg = sum(adj_t, dim=0)
+        in_deg = sum(adj_t, dim=1) # type: ignore
+        # out_deg = sum(adj_t, dim=0)
 
         in_deg_inv_sqrt = in_deg.pow_(-0.5)
         # out_deg_inv_sqrt = out_deg.pow_(-0.5)
 
-        in_deg_inv_sqrt.masked_fill_(in_deg_inv_sqrt == float('inf'), 0.)
+        in_deg_inv_sqrt.masked_fill_(in_deg_inv_sqrt == float("inf"), 0.0)
         # out_deg_inv_sqrt.masked_fill_(out_deg_inv_sqrt == float('inf'), 0.)
         # A = D_in^-0.5 * A * D_out^-0.5
         adj_t = mul(adj_t, in_deg_inv_sqrt.view(1, -1))
         adj_t = mul(adj_t, in_deg_inv_sqrt.view(-1, 1))
 
-        return adj_t
+        return adj_t # type: ignore
 
-    num_nodes = tu.num_nodes.maybe_num_nodes(edge_index, num_nodes)
+    assert isinstance(edge_index, Tensor)
+
+    num_nodes = tunn.maybe_num_nodes(edge_index, num_nodes)
 
     if edge_weight is None:
-        edge_weight = torch.ones((edge_index.size(1), ), dtype=dtype,
-                                 device=edge_index.device)
+        edge_weight = torch.ones(
+            (edge_index.size(1),), dtype=dtype, device=edge_index.device
+        )
 
     if add_self_loops:
         edge_index, tmp_edge_weight = tu.add_remaining_self_loops(
-            edge_index, edge_weight, fill_value, num_nodes)
+            edge_index, edge_weight, fill_value, num_nodes
+        )
         assert tmp_edge_weight is not None
         edge_weight = tmp_edge_weight
 
@@ -263,15 +305,20 @@ def gcn_norm(edge_index: Adj, edge_weight: Optional[Tensor] = None, num_nodes: O
     # out_deg_inv_sqrt = out_deg.pow_(-0.5)
 
     # out_deg_inv_sqrt.masked_fill_(out_deg_inv_sqrt == float('inf'), 0)
-    in_deg_inv_sqrt.masked_fill_(in_deg_inv_sqrt == float('inf'), 0)
+    in_deg_inv_sqrt.masked_fill_(in_deg_inv_sqrt == float("inf"), 0)
     # A = D_in^-0.5 * A * D_out^-0.5
     edge_weight = in_deg_inv_sqrt[col] * edge_weight * in_deg_inv_sqrt[row]
 
     return edge_index, edge_weight
 
 
-def inv_norm(edge_index: Adj, edge_weight: Optional[Tensor] = None, num_nodes: Optional[int] = None,
-             add_self_loops: bool = True, dtype: Optional[Any] = None) -> Adj:
+def inv_norm(
+    edge_index: Adj,
+    edge_weight: Optional[Tensor] = None,
+    num_nodes: Optional[int] = None,
+    add_self_loops: bool = True,
+    dtype: Optional[Any] = None,
+) -> Adj | Tuple[Tensor, Tensor]:
     """normalization layer with symmetric inverse-degree normalization
 
     Args:
@@ -290,27 +337,31 @@ def inv_norm(edge_index: Adj, edge_weight: Optional[Tensor] = None, num_nodes: O
     if isinstance(edge_index, SparseTensor):
         adj_t = edge_index
         if not adj_t.has_value():
-            adj_t = adj_t.fill_value(1., dtype=dtype)
+            adj_t = adj_t.fill_value(1.0, dtype=dtype)
         if add_self_loops:
-            adj_t = fill_diag(adj_t, fill_value)
+            adj_t = fill_diag(adj_t, fill_value) # type: ignore
 
-        in_deg = sum(adj_t, dim=1)
+        in_deg = sum(adj_t, dim=1) # type: ignore
         in_deg_inv = in_deg.pow_(-1.0)
-        in_deg_inv.masked_fill_(in_deg_inv == float('inf'), 0.)
+        in_deg_inv.masked_fill_(in_deg_inv == float("inf"), 0.0)
         adj_t = mul(adj_t, in_deg_inv.view(1, -1))
         adj_t = mul(adj_t, in_deg_inv.view(-1, 1))
 
-        return adj_t
+        return adj_t # type: ignore
 
-    num_nodes = tu.num_nodes.maybe_num_nodes(edge_index, num_nodes)
+    assert isinstance(edge_index, Tensor)
+
+    num_nodes = tunn.maybe_num_nodes(edge_index, num_nodes)
 
     if edge_weight is None:
-        edge_weight = torch.ones((edge_index.size(1), ), dtype=dtype,
-                                 device=edge_index.device)
+        edge_weight = torch.ones(
+            (edge_index.size(1),), dtype=dtype, device=edge_index.device
+        )
 
     if add_self_loops:
         edge_index, tmp_edge_weight = tu.add_remaining_self_loops(
-            edge_index, edge_weight, fill_value, num_nodes)
+            edge_index, edge_weight, fill_value, num_nodes
+        )
         assert tmp_edge_weight is not None
         edge_weight = tmp_edge_weight
 
@@ -320,7 +371,7 @@ def inv_norm(edge_index: Adj, edge_weight: Optional[Tensor] = None, num_nodes: O
     in_deg = scatter_add(edge_weight, col, dim=0, dim_size=num_nodes)
 
     in_deg_inv = in_deg.pow_(-1.0)
-    in_deg_inv.masked_fill_(in_deg_inv == float('inf'), 0)
+    in_deg_inv.masked_fill_(in_deg_inv == float("inf"), 0)
     # A = D_in^-1 * A * D_out^-1
     edge_weight = in_deg_inv[col] * edge_weight * in_deg_inv[row]
 
@@ -330,7 +381,9 @@ def inv_norm(edge_index: Adj, edge_weight: Optional[Tensor] = None, num_nodes: O
 class PropagationChain(nn.Module):
     """convenience layer which allows creation of a list chain of propagations (similar to torch.nn.Sequential)"""
 
-    def __init__(self, propagations: List[callable], activations: Optional[List[callable]] = None):
+    def __init__(
+        self, propagations: List[Callable], activations: Optional[List[Callable]] = None
+    ):
         super().__init__()
         self.propagations = propagations
         self.activations = activations
@@ -348,6 +401,7 @@ class PropagationChain(nn.Module):
 
 class GraphIdentity(nn.Module):
     """simple no-op layer compatible with API of typical graph-convolutional layers"""
+
     def __init__(self, *_, **__):
         super().__init__()
 
@@ -357,6 +411,7 @@ class GraphIdentity(nn.Module):
 
 class ConnectedComponents(MessagePassing):
     """layer finding connected components of a graph"""
+
     def __init__(self):
         super().__init__(aggr="max")
 

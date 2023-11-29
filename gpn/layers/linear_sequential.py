@@ -5,7 +5,7 @@ from .linear_spectral import SpectralLinear
 
 
 def LinearSequentialLayer(
-        input_dims: int, hidden_dims: int, output_dim: int,
+        input_dims: int, hidden_dims: int | list[int], output_dim: int,
         dropout_prob: Optional[float] = None,
         batch_norm: bool = False,
         k_lipschitz: Optional[float] = None,
@@ -20,7 +20,7 @@ def LinearSequentialLayer(
         else:
             hidden_dims = [hidden_dims]
 
-    dims = [np.prod(input_dims)] + hidden_dims + [output_dim]
+    dims: list[int] = [np.prod(input_dims, dtype=int)] + hidden_dims + [output_dim]
     num_layers = len(dims) - 1
     layers = []
 

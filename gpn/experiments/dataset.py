@@ -53,10 +53,12 @@ class ExperimentDataset:
 
     def __init__(self, data_cfg: DataConfiguration, to_sparse: bool = False):
         self.data_cfg = data_cfg
+        dataset = None
 
         for _ in range(data_cfg.split_no):
             dataset = DatasetManager(**data_cfg.to_dict())
 
+        assert dataset is not None
         default_dataset = InMemoryDatasetProvider(dataset)
 
         self.dim_features = default_dataset.num_features

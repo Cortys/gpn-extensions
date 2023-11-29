@@ -1,3 +1,4 @@
+from typing import Tuple
 import torch
 import torch.nn as nn
 import torch_geometric.nn as tnn
@@ -52,7 +53,7 @@ class GCNPropagate(tnn.MessagePassing):
                         edge_index, edge_weight, x.size(self.node_dim), improved=self.improved,
                         add_self_loops=self.add_self_loops, dtype=x.dtype,
                         normalization=self.normalization
-                    )
+                    ) # type: ignore
 
                     if self.cached:
                         self._cached_edge_index = (edge_index, edge_weight)
@@ -68,7 +69,7 @@ class GCNPropagate(tnn.MessagePassing):
                         edge_index, edge_weight, x.size(self.node_dim), improved=self.improved,
                         add_self_loops=self.add_self_loops, dtype=x.dtype,
                         normalization=self.normalization
-                    )
+                    ) # type: ignore
 
                     if self.cached:
                         self._cached_adj_t = edge_index
@@ -84,7 +85,7 @@ class GCNPropagate(tnn.MessagePassing):
         return x_j if edge_weight is None else edge_weight.view(-1, 1) * x_j
 
     def message_and_aggregate(self, adj_t: SparseTensor, x: Tensor) -> Tensor:
-        return matmul(adj_t, x, reduce=self.aggr)
+        return matmul(adj_t, x, reduce=self.aggr) # type: ignore
 
 
 class GCNConv(nn.Module):
@@ -130,21 +131,19 @@ class GCNConv(nn.Module):
                 unc_node_weight: OptTensor = None,
                 unc_edge_weight: OptTensor = None,
                 node_normalization: str = 'none',
-                return_normalizer=False) -> Tensor:
+                return_normalizer=False) -> Tensor | Tuple[Tensor, Tensor | None]:
         """
         combined transformation and propagation step
         """
 
         x = self.transform(x=x)
-        x = self.propagate(
+        return self.propagate(
             x=x, edge_index=edge_index,
             edge_weight=edge_weight,
             unc_node_weight=unc_node_weight,
             unc_edge_weight=unc_edge_weight,
             node_normalization=node_normalization,
-            return_normalizer=return_normalizer)
-
-        return x
+            return_normalizer=return_normalizer)    
 
     def transform(self, x: Tensor) -> Tensor:
         """
@@ -157,7 +156,7 @@ class GCNConv(nn.Module):
                   unc_node_weight: OptTensor = None,
                   unc_edge_weight: OptTensor = None,
                   node_normalization: str = 'none',
-                  return_normalizer=False) -> Tensor:
+                  return_normalizer=False) -> Tensor | Tuple[Tensor, Tensor | None]:
         """
         propagate and apply bias
         """

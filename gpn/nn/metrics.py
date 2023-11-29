@@ -7,8 +7,9 @@ from sklearn import metrics
 from gpn.utils import Prediction
 
 
-
-def expected_calibration_error(y_hat: Prediction, y: Tensor, n_bins: int = 10) -> Tensor:
+def expected_calibration_error(
+    y_hat: Prediction, y: Tensor, n_bins: int = 10
+) -> Tensor:
     """calculates the expected calibration error
 
     Args:
@@ -21,11 +22,11 @@ def expected_calibration_error(y_hat: Prediction, y: Tensor, n_bins: int = 10) -
     """
 
     if (y_hat.soft is None) or (y_hat.hard is None):
-        return torch.as_tensor(float('nan'))
+        return torch.as_tensor(float("nan"))
 
     batch_size = y_hat.soft.size(0)
     if batch_size == 0:
-        return torch.as_tensor(float('nan'))
+        return torch.as_tensor(float("nan"))
 
     acc_binned, conf_binned, bin_cardinalities = bin_predictions(y_hat, y, n_bins)
     ece = torch.abs(acc_binned - conf_binned) * bin_cardinalities
@@ -46,11 +47,11 @@ def maximum_calibration_error(y_hat: Prediction, y: Tensor, n_bins: int = 10) ->
     """
 
     if (y_hat.soft is None) or (y_hat.hard is None):
-        return torch.as_tensor(float('nan'))
+        return torch.as_tensor(float("nan"))
 
     batch_size = y_hat.soft.size(0)
     if batch_size == 0:
-        return torch.as_tensor(float('nan'))
+        return torch.as_tensor(float("nan"))
 
     acc_binned, conf_binned, _ = bin_predictions(y_hat, y, n_bins)
     mce = torch.abs(acc_binned - conf_binned)
@@ -71,7 +72,7 @@ def brier_score(y_hat: Tensor, y: Tensor) -> Tensor:
     """
     batch_size = y_hat.size(0)
     if batch_size == 0:
-        return torch.as_tensor(float('nan'))
+        return torch.as_tensor(float("nan"))
     prob = y_hat.clone()
     indices = torch.arange(batch_size)
     prob[indices, y] -= 1
@@ -79,7 +80,12 @@ def brier_score(y_hat: Tensor, y: Tensor) -> Tensor:
     return prob.norm(dim=-1, p=2).mean().detach().cpu()
 
 
-def confidence(y_hat: Prediction, y: Tensor, score_type: str = 'AUROC', uncertainty_type: str = 'aleatoric') -> Tensor:
+def confidence(
+    y_hat: Prediction,
+    y: Tensor,
+    score_type: str = "AUROC",
+    uncertainty_type: str = "aleatoric",
+) -> Tensor:
     """calculates AUROC/APR scores based on different confidence values (relevant for misclassification experiments)
 
     Args:
@@ -94,21 +100,25 @@ def confidence(y_hat: Prediction, y: Tensor, score_type: str = 'AUROC', uncertai
 
     corrects = (y.squeeze() == y_hat.hard).cpu().detach().int().numpy()
 
-    key = f'prediction_confidence_{uncertainty_type}'
+    key = f"prediction_confidence_{uncertainty_type}"
 
     if getattr(y_hat, key) is not None:
         scores = getattr(y_hat, key).cpu().detach().numpy()
 
         if len(scores) == 0:
-            return torch.as_tensor(float('nan'))
+            return torch.as_tensor(float("nan"))
 
         return _area_under_the_curve(score_type, corrects, scores)
 
-    return torch.as_tensor(float('nan'))
+    return torch.as_tensor(float("nan"))
 
 
-def average_confidence(y_hat: Prediction, _, confidence_type: str = 'prediction', 
-                       uncertainty_type: str = 'aleatoric') -> Tensor:
+def average_confidence(
+    y_hat: Prediction,
+    _,
+    confidence_type: str = "prediction",
+    uncertainty_type: str = "aleatoric",
+) -> Tensor:
     """calculates the average confidence scores involved in the prediction (either for prediction or uncertainty in general)
 
     Args:
@@ -121,12 +131,12 @@ def average_confidence(y_hat: Prediction, _, confidence_type: str = 'prediction'
         Tensor: average confidence
     """
 
-    key = f'{confidence_type}_confidence_{uncertainty_type}'
+    key = f"{confidence_type}_confidence_{uncertainty_type}"
 
     if getattr(y_hat, key) is not None:
         return getattr(y_hat, key).mean()
 
-    return torch.as_tensor(float('nan'))
+    return torch.as_tensor(float("nan"))
 
 
 def average_entropy(y_hat: Prediction, _) -> Tensor:
@@ -143,8 +153,14 @@ def average_entropy(y_hat: Prediction, _) -> Tensor:
     return entropy
 
 
-def ood_detection(y_hat: Prediction, _, y_hat_ood: Prediction, __,
-                  score_type: str = 'AUROC', uncertainty_type: str = 'aleatoric') -> Tensor:
+def ood_detection(
+    y_hat: Prediction,
+    _,
+    y_hat_ood: Prediction,
+    __,
+    score_type: str = "AUROC",
+    uncertainty_type: str = "aleatoric",
+) -> Tensor:
     """convenience function which computes the OOD APR/AUROC scores from model predictions on ID and OOD data based on estimates of 'aleatoric' or 'epistemic' uncertainty
 
     Args:
@@ -160,12 +176,13 @@ def ood_detection(y_hat: Prediction, _, y_hat_ood: Prediction, __,
     """
 
     # for compatibility with metrics-API: targets y also passed
-    key = f'sample_confidence_{uncertainty_type}'
+    key = f"sample_confidence_{uncertainty_type}"
     return _ood_detection(y_hat, y_hat_ood, key=key, score_type=score_type)
 
 
-def ood_detection_features(y_hat: Prediction, _, y_hat_ood: Prediction, __,
-                           score_type: str = 'AUROC') -> Tensor:
+def ood_detection_features(
+    y_hat: Prediction, _, y_hat_ood: Prediction, __, score_type: str = "AUROC"
+) -> Tensor:
     """convenience function which computes the OOD APR/AUROC scores from model predictions on ID and OOD data based on estimates of 'feature' uncertainty
 
     Args:
@@ -179,11 +196,14 @@ def ood_detection_features(y_hat: Prediction, _, y_hat_ood: Prediction, __,
         Tensor: APR/AUROC scores
     """
 
-    return _ood_detection(y_hat, y_hat_ood, key='sample_confidence_features', score_type=score_type)
+    return _ood_detection(
+        y_hat, y_hat_ood, key="sample_confidence_features", score_type=score_type
+    )
 
 
-def ood_detection_neighborhood(y_hat: Prediction, _, y_hat_ood: Prediction, __,
-                               score_type: str = 'AUROC') -> Tensor:
+def ood_detection_neighborhood(
+    y_hat: Prediction, _, y_hat_ood: Prediction, __, score_type: str = "AUROC"
+) -> Tensor:
     """convenience function which computes the OOD APR/AUROC scores from model predictions on ID and OOD data based on estimates of 'neighborhood' uncertainty
 
     Args:
@@ -197,11 +217,14 @@ def ood_detection_neighborhood(y_hat: Prediction, _, y_hat_ood: Prediction, __,
         Tensor: APR/AUROC scores
     """
 
-    return _ood_detection(y_hat, y_hat_ood, key='sample_confidence_neighborhood', score_type=score_type)
+    return _ood_detection(
+        y_hat, y_hat_ood, key="sample_confidence_neighborhood", score_type=score_type
+    )
 
 
-def ood_detection_structure(y_hat: Prediction, _, y_hat_ood: Prediction, __,
-                            score_type: str = 'AUROC') -> Tensor:
+def ood_detection_structure(
+    y_hat: Prediction, _, y_hat_ood: Prediction, __, score_type: str = "AUROC"
+) -> Tensor:
     """convenience function which computes the OOD APR/AUROC scores from model predictions on ID and OOD data based on estimates of 'structural' uncertainty
 
     Args:
@@ -215,10 +238,14 @@ def ood_detection_structure(y_hat: Prediction, _, y_hat_ood: Prediction, __,
         Tensor: APR/AUROC scores
     """
 
-    return _ood_detection(y_hat, y_hat_ood, key='sample_confidence_structure', score_type=score_type)
+    return _ood_detection(
+        y_hat, y_hat_ood, key="sample_confidence_structure", score_type=score_type
+    )
 
 
-def _ood_detection(y_hat: Prediction, y_hat_ood: Prediction, key: str, score_type: str) -> Tensor:
+def _ood_detection(
+    y_hat: Prediction, y_hat_ood: Prediction, key: str, score_type: str
+) -> Tensor:
     """interntal convenience function to compute APR/AUROC scores for OOD detection based on predictions on ID and OOD data
 
     Args:
@@ -230,18 +257,18 @@ def _ood_detection(y_hat: Prediction, y_hat_ood: Prediction, key: str, score_typ
     Returns:
         Tensor: APR/AUROC scores
     """
-    y_hat = getattr(y_hat, key)
-    y_hat_ood = getattr(y_hat_ood, key)
+    y_hat_t: Tensor = getattr(y_hat, key)
+    y_hat_ood_t: Tensor = getattr(y_hat_ood, key)
 
     if (y_hat is not None) and (y_hat_ood is not None):
-        scores = y_hat.cpu().detach().numpy()
-        ood_scores = y_hat_ood.cpu().detach().numpy()
+        scores = y_hat_t.cpu().detach().numpy()
+        ood_scores = y_hat_ood_t.cpu().detach().numpy()
 
     else:
-        return torch.as_tensor(float('nan'))
+        return torch.as_tensor(float("nan"))
 
     if (len(scores) == 0) or (len(ood_scores) == 0):
-        return torch.as_tensor(float('nan'))
+        return torch.as_tensor(float("nan"))
 
     n_id = scores.shape[0]
     n_ood = ood_scores.shape[0]
@@ -256,7 +283,9 @@ def _ood_detection(y_hat: Prediction, y_hat_ood: Prediction, key: str, score_typ
     return _area_under_the_curve(score_type, corrects, scores)
 
 
-def _area_under_the_curve(score_type: str, corrects: np.array, scores: np.array) -> Tensor:
+def _area_under_the_curve(
+    score_type: str, corrects: np.ndarray, scores: np.ndarray
+) -> Tensor:
     """calculates the area-under-the-curve score (either PR or ROC)
 
     Args:
@@ -273,18 +302,20 @@ def _area_under_the_curve(score_type: str, corrects: np.array, scores: np.array)
     # avoid INF or NAN values
     scores = np.nan_to_num(scores)
 
-    if score_type == 'AUROC':
+    if score_type == "AUROC":
         fpr, tpr, _ = metrics.roc_curve(corrects, scores)
         return torch.as_tensor(metrics.auc(fpr, tpr))
 
-    if score_type == 'APR':
+    if score_type == "APR":
         prec, rec, _ = metrics.precision_recall_curve(corrects, scores)
         return torch.as_tensor(metrics.auc(rec, prec))
 
     raise AssertionError
 
 
-def bin_predictions(y_hat: Prediction, y: Tensor, n_bins: int = 10) -> Tuple[Tensor, Tensor, Tensor]:
+def bin_predictions(
+    y_hat: Prediction, y: Tensor, n_bins: int = 10
+) -> Tuple[Tensor, Tensor, Tensor]:
     """bins predictions based on predicted class probilities
 
     Args:
@@ -295,25 +326,25 @@ def bin_predictions(y_hat: Prediction, y: Tensor, n_bins: int = 10) -> Tuple[Ten
     Returns:
         Tuple[Tensor, Tensor, Tensor]: tuple of binned accuracy values, confidence values and cardinalities of each bin
     """
-    y_hat, y_hat_label = y_hat.soft, y_hat.hard
-    y_hat = y_hat.max(-1)[0]
-    corrects = (y_hat_label == y.squeeze())
+    y_hat_t, y_hat_label_t = y_hat.soft, y_hat.hard
+    y_hat_t = y_hat_t.max(-1)[0]
+    corrects = y_hat_label_t == y.squeeze()
 
-    acc_binned = torch.zeros((n_bins, ), device=y_hat.device)
-    conf_binned = torch.zeros((n_bins, ), device=y_hat.device)
-    bin_cardinalities = torch.zeros((n_bins, ), device=y_hat.device)
+    acc_binned = torch.zeros((n_bins,), device=y_hat_t.device)
+    conf_binned = torch.zeros((n_bins,), device=y_hat_t.device)
+    bin_cardinalities = torch.zeros((n_bins,), device=y_hat_t.device)
 
     bin_boundaries = torch.linspace(0, 1, n_bins + 1)
     lower_bin_boundary = bin_boundaries[:-1]
     upper_bin_boundary = bin_boundaries[1:]
 
     for b in range(n_bins):
-        in_bin = (y_hat <= upper_bin_boundary[b]) & (y_hat > lower_bin_boundary[b])
+        in_bin = (y_hat_t <= upper_bin_boundary[b]) & (y_hat_t > lower_bin_boundary[b])
         bin_cardinality = in_bin.sum()
         bin_cardinalities[b] = bin_cardinality
 
         if bin_cardinality > 0:
             acc_binned[b] = corrects[in_bin].float().mean()
-            conf_binned[b] = y_hat[in_bin].mean()
+            conf_binned[b] = y_hat_t[in_bin].mean()
 
     return acc_binned, conf_binned, bin_cardinalities

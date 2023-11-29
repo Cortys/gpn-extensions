@@ -16,7 +16,7 @@ class MultipleRunExperiment:
             data_cfg: DataConfiguration,
             model_cfg: ModelConfiguration,
             training_cfg: TrainingConfiguration,
-            ex: Experiment = None):
+            ex: Experiment | None = None):
 
         self.run_cfg = run_cfg
         self.data_cfg = data_cfg

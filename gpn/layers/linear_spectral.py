@@ -1,7 +1,7 @@
 from typing import Optional
 import torch.nn as nn
 from torch import Tensor
-from torch.nn.utils import spectral_norm
+from torch.nn.utils.spectral_norm import spectral_norm
 
 
 class SpectralLinear(nn.Module):

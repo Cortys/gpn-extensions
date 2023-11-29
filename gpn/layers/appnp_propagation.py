@@ -46,7 +46,7 @@ class APPNPPropagation(MessagePassing):
                         edge_index, edge_weight, x.size(self.node_dim), improved=False,
                         add_self_loops=self.add_self_loops, dtype=x.dtype,
                         normalization=self.normalization
-                    )
+                    ) # type: ignore
 
                     if self.cached:
                         self._cached_edge_index = (edge_index, edge_weight)
@@ -62,12 +62,12 @@ class APPNPPropagation(MessagePassing):
                         edge_index, edge_weight, x.size(self.node_dim), improved=False,
                         add_self_loops=self.add_self_loops, dtype=x.dtype,
                         normalization=self.normalization
-                    )
+                    ) # type: ignore
 
                     if self.cached:
-                        self._cached_adj_t = edge_index
+                        self._cached_adj_t = edge_index # type: ignore
                 else:
-                    edge_index = cache
+                    edge_index = cache # type: ignore
 
         h = x
 
@@ -78,7 +78,7 @@ class APPNPPropagation(MessagePassing):
                     edge_weight = F.dropout(edge_weight, p=self.dropout)
 
                 else:
-                    value = edge_index.storage.value()
+                    value = edge_index.storage.value() # type: ignore
                     assert value is not None
                     value = F.dropout(value, p=self.dropout)
                     edge_index = edge_index.set_value(value, layout='coo')
@@ -96,7 +96,7 @@ class APPNPPropagation(MessagePassing):
         return x_j if edge_weight is None else edge_weight.view(-1, 1) * x_j
 
     def message_and_aggregate(self, adj_t: SparseTensor, x: Tensor) -> Tensor:
-        return matmul(adj_t, x, reduce=self.aggr)
+        return matmul(adj_t, x, reduce=self.aggr) # type: ignore
 
     def __repr__(self):
         return '{}(K={}, alpha={})'.format(self.__class__.__name__, self.K,

@@ -12,13 +12,15 @@ class GCN(Model):
 
     def __init__(self, params: ModelConfiguration):
         super().__init__(params)
+        assert isinstance(self.params.dim_hidden, int)
 
         self.conv1 = GCNConv(
             self.params.dim_features,
             self.params.dim_hidden,
             cached=False,
             add_self_loops=True,
-            normalization='sym')
+            normalization="sym",
+        )
 
         activation = []
 
@@ -32,14 +34,19 @@ class GCN(Model):
             self.params.num_classes,
             cached=False,
             add_self_loops=True,
-            normalization='sym')
+            normalization="sym",
+        )
 
     def forward_impl(self, data: Data) -> Tensor:
         if data.edge_index is not None:
             edge_index = data.edge_index
             if self.params.dropout_prob_adj > 0:
-                edge_index, _ = dropout_adj(edge_index, p=self.params.dropout_prob_adj, 
-                                            force_undirected=False, training=self.training)
+                edge_index, _ = dropout_adj(
+                    edge_index,
+                    p=self.params.dropout_prob_adj,
+                    force_undirected=False,
+                    training=self.training,
+                )
         else:
             edge_index = data.adj_t
 

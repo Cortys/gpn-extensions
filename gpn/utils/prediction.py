@@ -1,4 +1,5 @@
 from __future__ import annotations
+from pyblaze.nn.callbacks.logging import PredictionProgressLogger
 
 import torch
 import attr
@@ -65,14 +66,14 @@ class Prediction(HalfFrozenObject):
 
     # scores for prediction confidence
     prediction_confidence_aleatoric: torch.Tensor = attr.ib(default=None)
-    prediction_confidence_epistemic: torch.Tensor = attr.ib(default=None)
-    prediction_confidence_structure: torch.Tensor = attr.ib(default=None)
+    prediction_confidence_epistemic: torch.Tensor | None = attr.ib(default=None)
+    prediction_confidence_structure: torch.Tensor | None = attr.ib(default=None)
 
     # scores for sample confidence
     sample_confidence_aleatoric: torch.Tensor = attr.ib(default=None)
-    sample_confidence_epistemic: torch.Tensor = attr.ib(default=None)
-    sample_confidence_structure: torch.Tensor = attr.ib(default=None)
-    sample_confidence_features: torch.Tensor = attr.ib(default=None)
+    sample_confidence_epistemic: torch.Tensor | None = attr.ib(default=None)
+    sample_confidence_structure: torch.Tensor | None = attr.ib(default=None)
+    sample_confidence_features: torch.Tensor | None = attr.ib(default=None)
     sample_confidence_neighborhood: torch.Tensor = attr.ib(default=None)
 
     # RGCN
@@ -94,7 +95,7 @@ class Prediction(HalfFrozenObject):
     act_vec: torch.Tensor = attr.ib(default=None)
     q: torch.Tensor = attr.ib(default=None)
 
-    def collate(self, p_to_collate: Prediction) -> Prediction:
+    def collate(self, p_to_collate: Prediction | list[Prediction] | tuple[Prediction]) -> Prediction:
         for var_name, var_val in vars(self).items():
             if var_val is None:
                 continue

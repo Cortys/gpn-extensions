@@ -48,7 +48,7 @@ def swap_labels(data: Data, i: int, j: int):
 
 
 def get_ood_split(
-        data,
+        data: Data,
         ood_frac_left_out_classes: float = 0.45,
         ood_num_left_out_classes: Optional[int] = None,
         ood_leave_out_last_classes: Optional[bool] = False,
@@ -78,7 +78,7 @@ def get_ood_split(
     assert hasattr(data, 'train_mask') and hasattr(data, 'val_mask') \
             and hasattr(data, 'test_mask')
 
-    num_classes = data.y.max().item() + 1
+    num_classes: int = data.y.max().item() + 1
     classes = np.arange(num_classes)
 
     if ood_left_out_classes is None:
@@ -131,7 +131,7 @@ def get_ood_split(
 
     # finally apply positional mapping of classes from above to ensure that
     # classes are ordered properly (i.e. create dataset with labels being in range 0 --- new_num_classes - 1)
-    data.y = torch.LongTensor([class_mapping[y.item()] for y in data.y], device=data.y.device)
+    data.y = torch.LongTensor([class_mapping[y.item()] for y in data.y], device=data.y.device) # type: ignore
 
     return data, num_classes
 
@@ -162,7 +162,7 @@ def get_ood_split_evasion(data, **ood_kwargs):
             continue
 
         if k == 'edge_index':
-            id_data.edge_index = id_edge_index
+            id_data.edge_index = id_edge_index # type: ignore
 
         elif isinstance(v, torch.Tensor):
             id_data[k] = v[id_nodes]

@@ -57,7 +57,7 @@ class ConditionedRadial(Transform):
     domain = constraints.real_vector
     codomain = constraints.real_vector
     bijective = True
-    event_dim = 1
+    event_dim = 1 # type: ignore
 
     def __init__(self, params):
         super().__init__(cache_size=1)

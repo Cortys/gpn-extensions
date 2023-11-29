@@ -18,7 +18,7 @@ class Categorical(D.Categorical, Likelihood):
 
     @property
     def mean(self):
-        return self.logits.argmax(-1)
+        return self.logits.argmax(-1) # type: ignore
 
     @property
     def sufficient_statistic_mean(self):
@@ -26,7 +26,7 @@ class Categorical(D.Categorical, Likelihood):
 
     def to(self, *args, **kwargs):
         if 'probs' in self.__dict__:
-            self.probs = self.probs.to(*args, **kwargs)
+            self.probs = self.probs.to(*args, **kwargs) # type: ignore
         else:
-            self.logits = self.logits.to(*args, **kwargs)
+            self.logits = self.logits.to(*args, **kwargs) # type: ignore
         return self

@@ -33,9 +33,12 @@ class ExponentialFamilyOutput(nn.Module):
         self.target = target_distribution
         self.posterior = target_distribution.__prior__()
 
-    def forward(self, params: Union[Tensor, List[Tensor]],
-                evidence: Tensor,
-                prior: Optional[Tuple[Tensor, Tensor]] = None) -> ConjugatePrior:
+    def forward(
+        self,
+        params: Union[Tensor, List[Tensor]],
+        evidence: Tensor,
+        prior: Optional[Tuple[Tensor, Tensor]] = None,
+    ) -> ConjugatePrior:
         """
         Returns (a batched version of) the target distribution's conjugate prior.
 
@@ -60,19 +63,19 @@ class ExponentialFamilyOutput(nn.Module):
         distribution = self.target.from_model_params(params)
         statistic = distribution.sufficient_statistic_mean
 
-        return self.posterior.from_sufficient_statistic(statistic, evidence, prior=prior)
+        return self.posterior.from_sufficient_statistic(
+            statistic, evidence, prior=prior
+        )
 
 
 class Evidence(nn.Module):
     """layer to transform density values into evidence representations according to a predefined scale"""
 
-    def __init__(self,
-                 scale: str,
-                 tau: Optional[float] = None):
+    def __init__(self, scale: str, tau: Optional[float] = None):
         super().__init__()
         self.tau = tau
 
-        assert scale in ('latent-old', 'latent-new', 'latent-new-plus-classes', None)
+        assert scale in ("latent-old", "latent-new", "latent-new-plus-classes", None)
         self.scale = scale
 
     def forward(self, log_q_c: Tensor, dim: int, **kwargs) -> Tensor:
@@ -88,9 +91,9 @@ class Evidence(nn.Module):
     def log_scale(self, dim: int, further_scale: int = 1) -> float:
         scale = 0
 
-        if 'latent-old' in self.scale:
+        if "latent-old" in self.scale:
             scale = 0.5 * (dim * math.log(2 * math.pi) + math.log(dim + 1))
-        if 'latent-new' in self.scale:
+        if "latent-new" in self.scale:
             scale = 0.5 * dim * math.log(4 * math.pi)
 
         scale = scale + math.log(further_scale)
@@ -104,17 +107,18 @@ class Density(nn.Module):
     embeddings z into alpha-scores with normalizing flows
     """
 
-    def __init__(self,
-                 dim_latent: int,
-                 num_mixture_elements: int,
-                 radial_layers: int = 6,
-                 maf_layers: int = 0,
-                 gaussian_layers: int = 0,
-                 flow_size: float = 0.5,
-                 maf_n_hidden: int = 2,
-                 flow_batch_norm: bool = False,
-                 use_batched_flow: bool = False):
-
+    def __init__(
+        self,
+        dim_latent: int,
+        num_mixture_elements: int,
+        radial_layers: int = 6,
+        maf_layers: int = 0,
+        gaussian_layers: int = 0,
+        flow_size: float = 0.5,
+        maf_n_hidden: int = 2,
+        flow_batch_norm: bool = False,
+        use_batched_flow: bool = False,
+    ):
         super().__init__()
         self.num_mixture_elements = num_mixture_elements
         self.dim_latent = dim_latent
@@ -132,23 +136,31 @@ class Density(nn.Module):
                 c=num_mixture_elements,
                 dim=dim_latent,
                 flow_length=radial_layers,
-                flow_type='radial_flow')
+                flow_type="radial_flow",
+            )
 
         elif self.use_flow:
-            self.flow = nn.ModuleList([
-                NormalizingFlow(
-                    dim=self.dim_latent,
-                    radial_layers=radial_layers,
-                    maf_layers=maf_layers,
-                    flow_size=flow_size,
-                    n_hidden=maf_n_hidden,
-                    batch_norm=flow_batch_norm) 
-                for _ in range(num_mixture_elements)])
+            self.flow = nn.ModuleList(
+                [
+                    NormalizingFlow(
+                        dim=self.dim_latent,
+                        radial_layers=radial_layers,
+                        maf_layers=maf_layers,
+                        flow_size=flow_size,
+                        n_hidden=maf_n_hidden,
+                        batch_norm=flow_batch_norm,
+                    )
+                    for _ in range(num_mixture_elements)
+                ]
+            )
 
         else:
-            self.flow = nn.ModuleList([MixtureDensity(
-                dim=self.dim_latent,
-                n_components=gaussian_layers) for _ in range(num_mixture_elements)])
+            self.flow = nn.ModuleList(
+                [
+                    MixtureDensity(dim=self.dim_latent, n_components=gaussian_layers)
+                    for _ in range(num_mixture_elements)
+                ]
+            )
 
     def forward(self, z: Tensor) -> Tensor:
         # produces log p(z|c)
@@ -164,7 +176,7 @@ class Density(nn.Module):
         if not self.training:
             # If we're evaluating and observe a NaN value, this is always caused by the
             # normalizing flow "diverging". We force these values to minus infinity.
-            log_q_c[torch.isnan(log_q_c)] = float('-inf')
+            log_q_c[torch.isnan(log_q_c)] = float("-inf")
 
         return log_q_c
 
@@ -172,6 +184,7 @@ class Density(nn.Module):
         return self.flow.log_prob(z).transpose(0, 1)
 
     def forward_flow(self, z: Tensor) -> Tensor:
+        assert isinstance(self.flow, nn.ModuleList)
         n_nodes = z.size(0)
         log_q = torch.zeros((n_nodes, self.num_mixture_elements)).to(z.device.type)
 
@@ -183,6 +196,7 @@ class Density(nn.Module):
         return log_q
 
     def forward_mixture(self, z: Tensor) -> Tensor:
+        assert isinstance(self.flow, nn.ModuleList)
         n_nodes = z.size(0)
         log_q = torch.zeros((n_nodes, self.num_mixture_elements)).to(z.device.type)
 
