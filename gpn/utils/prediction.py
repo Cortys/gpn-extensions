@@ -24,7 +24,7 @@ class Prediction(HalfFrozenObject):
 
     # hidden / latent variables
     x_hat: torch.Tensor = attr.ib(default=None)
-    logits: torch.Tensor = attr.ib(default=None)
+    logits: torch.Tensor | None = attr.ib(default=None)
     logits_features: torch.Tensor = attr.ib(default=None)
     latent: torch.Tensor = attr.ib(default=None)
     latent_node: torch.Tensor = attr.ib(default=None)

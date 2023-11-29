@@ -26,6 +26,8 @@ class GPN(Model):
         else:
             num_layers = self.params.num_layers
 
+        assert isinstance(self.params.dim_hidden, int)
+
         if num_layers > 2:
             self.input_encoder = LinearSequentialLayer(
                 self.params.dim_features,
@@ -33,35 +35,45 @@ class GPN(Model):
                 self.params.dim_hidden,
                 batch_norm=self.params.batch_norm,
                 dropout_prob=self.params.dropout_prob,
-                activation_in_all_layers=True)
+                activation_in_all_layers=True,
+            )
         else:
             self.input_encoder = nn.Sequential(
                 nn.Linear(self.params.dim_features, self.params.dim_hidden),
                 nn.ReLU(),
-                nn.Dropout(p=self.params.dropout_prob))
+                nn.Dropout(p=self.params.dropout_prob),
+            )
 
         self.latent_encoder = nn.Linear(self.params.dim_hidden, self.params.dim_latent)
 
-        use_batched = True if self.params.use_batched_flow else False 
+        use_batched = True if self.params.use_batched_flow else False
         self.flow = Density(
             dim_latent=self.params.dim_latent,
             num_mixture_elements=self.params.num_classes,
             radial_layers=self.params.radial_layers,
             maf_layers=self.params.maf_layers,
             gaussian_layers=self.params.gaussian_layers,
-            use_batched_flow=use_batched)
+            use_batched_flow=use_batched,
+        )
 
-        self.evidence = Evidence(scale=self.params.alpha_evidence_scale)
+        self.evidence = Evidence(scale=self.params.alpha_evidence_scale)  # type: ignore
 
         self.propagation = APPNPPropagation(
             K=self.params.K,
             alpha=self.params.alpha_teleport,
             add_self_loops=self.params.add_self_loops,
             cached=False,
-            normalization='sym')
+            normalization="sym",
+        )
 
-        assert self.params.pre_train_mode in ('encoder', 'flow', None)
-        assert self.params.likelihood_type in ('UCE', 'nll_train', 'nll_train_and_val', 'nll_consistency', None)
+        assert self.params.pre_train_mode in ("encoder", "flow", None)
+        assert self.params.likelihood_type in (
+            "UCE",
+            "nll_train",
+            "nll_train_and_val",
+            "nll_consistency",
+            None,
+        )
 
     def forward(self, data: Data) -> Prediction:
         return self.forward_impl(data)
@@ -76,14 +88,17 @@ class GPN(Model):
         p_c = self.get_class_probalities(data)
         log_q_ft_per_class = self.flow(z) + p_c.view(1, -1).log()
 
-        if '-plus-classes' in self.params.alpha_evidence_scale:
+        if (
+            isinstance(self.params.alpha_evidence_scale, str)
+            and "-plus-classes" in self.params.alpha_evidence_scale
+        ):
             further_scale = self.params.num_classes
         else:
             further_scale = 1.0
 
         beta_ft = self.evidence(
-            log_q_ft_per_class, dim=self.params.dim_latent,
-            further_scale=further_scale).exp()
+            log_q_ft_per_class, dim=self.params.dim_latent, further_scale=further_scale
+        ).exp()
 
         alpha_features = 1.0 + beta_ft
 
@@ -103,57 +118,72 @@ class GPN(Model):
             soft=soft,
             log_soft=log_soft,
             hard=hard,
-
             logits=logits,
             latent=z,
             latent_features=z,
-
             hidden=h,
             hidden_features=h,
-
             evidence=beta.sum(-1),
             evidence_ft=beta_ft.sum(-1),
             log_ft_per_class=log_q_ft_per_class,
-
             # prediction confidence scores
             prediction_confidence_aleatoric=max_soft,
             prediction_confidence_epistemic=alpha[torch.arange(hard.size(0)), hard],
             prediction_confidence_structure=None,
-
             # sample confidence scores
             sample_confidence_aleatoric=max_soft,
             sample_confidence_epistemic=alpha.sum(-1),
             sample_confidence_features=alpha_features.sum(-1),
-            sample_confidence_structure=None
+            sample_confidence_structure=None,
         )
         # ---------------------------------------------------------------------------------
 
         return pred
 
-    def get_optimizer(self, lr: float, weight_decay: float) -> Tuple[optim.Adam, optim.Adam]:
-        flow_lr = lr if self.params.factor_flow_lr is None else self.params.factor_flow_lr * lr
-        flow_weight_decay = weight_decay if self.params.flow_weight_decay is None else self.params.flow_weight_decay
+    def get_optimizer(
+        self, lr: float, weight_decay: float
+    ) -> Tuple[optim.Adam, optim.Adam]:
+        flow_lr = (
+            lr
+            if self.params.factor_flow_lr is None
+            else self.params.factor_flow_lr * lr
+        )
+        flow_weight_decay = (
+            weight_decay
+            if self.params.flow_weight_decay is None
+            else self.params.flow_weight_decay
+        )
 
         flow_params = list(self.flow.named_parameters())
-        flow_param_names = [f'flow.{p[0]}' for p in flow_params]
+        flow_param_names = [f"flow.{p[0]}" for p in flow_params]
         flow_param_weights = [p[1] for p in flow_params]
 
         all_params = list(self.named_parameters())
         params = [p[1] for p in all_params if p[0] not in flow_param_names]
 
         # all params except for flow
-        flow_optimizer = optim.Adam(flow_param_weights, lr=flow_lr, weight_decay=flow_weight_decay)
+        flow_optimizer = optim.Adam(
+            flow_param_weights, lr=flow_lr, weight_decay=flow_weight_decay
+        )
         model_optimizer = optim.Adam(
-            [{'params': flow_param_weights, 'lr': flow_lr, 'weight_decay': flow_weight_decay},
-             {'params': params}],
-            lr=lr, weight_decay=weight_decay)
+            [
+                {
+                    "params": flow_param_weights,
+                    "lr": flow_lr,
+                    "weight_decay": flow_weight_decay,
+                },
+                {"params": params},
+            ],
+            lr=lr,
+            weight_decay=weight_decay,
+        )
 
         return model_optimizer, flow_optimizer
 
     def get_warmup_optimizer(self, lr: float, weight_decay: float) -> optim.Adam:
         model_optimizer, flow_optimizer = self.get_optimizer(lr, weight_decay)
 
-        if self.params.pre_train_mode == 'encoder':
+        if self.params.pre_train_mode == "encoder":
             warmup_optimizer = model_optimizer
         else:
             warmup_optimizer = flow_optimizer
@@ -164,24 +194,31 @@ class GPN(Model):
         # similar to warmup
         return self.get_warmup_optimizer(lr, weight_decay)
 
-    def uce_loss(self, prediction: Prediction, data: Data, approximate=True) -> Tuple[torch.Tensor, torch.Tensor]:
-        alpha_train, y = apply_mask(data, prediction.alpha, split='train')
+    def uce_loss(
+        self, prediction: Prediction, data: Data, approximate=True
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        alpha_train, y = apply_mask(data, prediction.alpha, split="train") # type: ignore
         reg = self.params.entropy_reg
-        return uce_loss(alpha_train, y, reduction='sum'), \
-            entropy_reg(alpha_train, reg, approximate=approximate, reduction='sum')
+        return uce_loss(alpha_train, y, reduction="sum"), entropy_reg( # type: ignore
+            alpha_train, reg, approximate=approximate, reduction="sum" # type: ignore
+        )
 
     def loss(self, prediction: Prediction, data: Data) -> Dict[str, torch.Tensor]:
         uce, reg = self.uce_loss(prediction, data)
-        n_train = data.train_mask.sum() if self.params.loss_reduction == 'mean' else 1
-        return {'UCE': uce / n_train, 'REG': reg / n_train}
+        n_train = data.train_mask.sum() if self.params.loss_reduction == "mean" else 1
+        return {"UCE": uce / n_train, "REG": reg / n_train}
 
-    def warmup_loss(self, prediction: Prediction, data: Data) -> Dict[str, torch.Tensor]:
-        if self.params.pre_train_mode == 'encoder':
+    def warmup_loss(
+        self, prediction: Prediction, data: Data
+    ) -> Dict[str, torch.Tensor]:
+        if self.params.pre_train_mode == "encoder":
             return self.CE_loss(prediction, data)
 
         return self.loss(prediction, data)
 
-    def finetune_loss(self, prediction: Prediction, data: Data) -> Dict[str, torch.Tensor]:
+    def finetune_loss(
+        self, prediction: Prediction, data: Data
+    ) -> Dict[str, torch.Tensor]:
         return self.warmup_loss(prediction, data)
 
     def likelihood(self, prediction: Prediction, data: Data) -> Dict[str, torch.Tensor]:

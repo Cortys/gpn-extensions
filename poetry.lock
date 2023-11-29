@@ -3922,6 +3922,17 @@ tests = ["autopep8", "flake8", "isort", "numpy", "pytest", "scipy (>=1.7.1)"]
 tutorials = ["matplotlib", "pandas", "tabulate"]
 
 [[package]]
+name = "types-protobuf"
+version = "4.24.0.4"
+description = "Typing stubs for protobuf"
+optional = false
+python-versions = ">=3.7"
+files = [
+    {file = "types-protobuf-4.24.0.4.tar.gz", hash = "sha256:57ab42cb171dfdba2c74bb5b50c250478538cc3c5ed95b8b368929ad0c9f90a5"},
+    {file = "types_protobuf-4.24.0.4-py3-none-any.whl", hash = "sha256:131ab7d0cbc9e444bc89c994141327dcce7bcaeded72b1acb72a94827eb9c7af"},
+]
+
+[[package]]
 name = "types-python-dateutil"
 version = "2.8.19.14"
 description = "Typing stubs for python-dateutil"
@@ -3931,6 +3942,21 @@ files = [
     {file = "types-python-dateutil-2.8.19.14.tar.gz", hash = "sha256:1f4f10ac98bb8b16ade9dbee3518d9ace017821d94b057a425b069f834737f4b"},
     {file = "types_python_dateutil-2.8.19.14-py3-none-any.whl", hash = "sha256:f977b8de27787639986b4e28963263fd0e5158942b3ecef91b9335c130cb1ce9"},
 ]
+
+[[package]]
+name = "types-tensorflow"
+version = "2.12.0.10"
+description = "Typing stubs for tensorflow"
+optional = false
+python-versions = ">=3.7"
+files = [
+    {file = "types-tensorflow-2.12.0.10.tar.gz", hash = "sha256:e1c694b50337f0d4c587ecad29bbe9b91a87f7f437f07ddf093685c82f33648c"},
+    {file = "types_tensorflow-2.12.0.10-py3-none-any.whl", hash = "sha256:af47f3bb398923a9b5bdb27089b832a8cd0df95b4ae86fae39bd7f55b28f11a8"},
+]
+
+[package.dependencies]
+numpy = ">=1.20"
+types-protobuf = "*"
 
 [[package]]
 name = "typing-extensions"
@@ -4155,4 +4181,4 @@ files = [
 [metadata]
 lock-version = "2.0"
 python-versions = "3.10.x"
-content-hash = "8da3cdaf533940b12d909f9a5a8567186fa820597a537add883f568cdefca48d"
+content-hash = "b4c8e0124ab673600b2f74cbf35655d2c3fab5e02aa9472ba0bb893b96cd994d"

@@ -14,8 +14,9 @@ def create_model(params: ModelConfiguration) -> Model:
     """
 
     model = getattr(sys.modules[__package__], params.model_name)
+    m = None
 
     for _ in range(params.init_no):
         m = model(params)
 
-    return m
+    return m # type: ignore

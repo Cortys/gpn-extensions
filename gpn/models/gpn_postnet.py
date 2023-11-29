@@ -22,7 +22,7 @@ from .gpn_postnet_diff import GPN_MLP
 class PostNet(Model):
     """PosteriorNetwork model (used in ablation studies, i.e. only PostNet on feature-level, no propagation)"""
 
-    def __init__(self, params):
+    def __init__(self, params: ModelConfiguration):
         super().__init__(None)
         self.gpn_mlp = GPN_MLP(params)
 
@@ -84,7 +84,7 @@ class PostNet(Model):
 
     def create_storage(self, run_cfg: RunConfiguration, data_cfg: DataConfiguration,
                        model_cfg: ModelConfiguration, train_cfg: TrainingConfiguration,
-                       ex: Experiment = None):
+                       ex: Experiment | None = None):
         # create storage for model itself
         postnet_model_cfg = model_cfg.clone()
         postnet_model_cfg.set_values(

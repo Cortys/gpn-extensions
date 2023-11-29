@@ -51,7 +51,7 @@ class GPFLOWGGP(Model):
 
         return pred
 
-    def _predict(self, data: Data) -> Tuple[np.array, np.array]:
+    def _predict(self, data: Data) -> Tuple[torch.Tensor, torch.Tensor]:
         raise NotImplementedError
 
     def _train_model(self, data: Data) -> None:
@@ -80,7 +80,7 @@ class GPFLOWGGP(Model):
         predict_fn = tf.function(
             frozen_model.predict_y, input_signature=[tf.TensorSpec(shape=[None, 1], dtype=tf.float64)]
         )
-        module_to_save.predict_y = predict_fn
+        module_to_save.predict_y = predict_fn # type: ignore
         tf.saved_model.save(module_to_save, model_path)
 
     def load_from_file(self, model_path: str) -> None:

@@ -15,9 +15,9 @@ from gpn.utils import ModelConfiguration
 from .gpflow_gpp import GPFLOWGGP
 from .ggp_utils import GraphPolynomial, GraphSVGP, NodeInducingPoints, training_step
 
-gpflow.config.set_default_float(tf.float64)
+gpflow.config.set_default_float(tf.float64)  # type: ignore
 gpflow.config.set_default_summary_fmt("notebook")
-tf.get_logger().setLevel('ERROR')
+tf.get_logger().setLevel("ERROR")
 
 
 class GGP(GPFLOWGGP):
@@ -37,7 +37,7 @@ class GGP(GPFLOWGGP):
         # convert features
         node_feats = data.x.cpu().numpy().astype(np.float64)
         transformer = TfidfTransformer(smooth_idf=True)
-        node_feats = transformer.fit_transform(node_feats).toarray().astype(np.float64)
+        node_feats = transformer.fit_transform(node_feats).toarray().astype(np.float64) # type: ignore
 
         # num-classes
         num_classes = self.params.num_classes
@@ -53,15 +53,20 @@ class GGP(GPFLOWGGP):
 
         # Init inducing points
         # use as many inducing points as training samples
-        inducing_points = kmeans2(node_feats, len(idx_train), minit='points')[0]
+        inducing_points = kmeans2(node_feats, len(idx_train), minit="points")[0]
         inducing_points = NodeInducingPoints(inducing_points)
 
         # Init GP model
         mean_function = Constant()
         gprocess = GraphSVGP(
-            kernel, gpflow.likelihoods.MultiClass(num_classes),
-            inducing_points, mean_function=mean_function,
-            num_latent_gps=num_classes, whiten=True, q_diag=False)
+            kernel,
+            gpflow.likelihoods.MultiClass(num_classes),
+            inducing_points,
+            mean_function=mean_function,
+            num_latent_gps=num_classes,
+            whiten=True,
+            q_diag=False,
+        )
 
         # Init optimizer
         optimizer = tf.optimizers.Adam()
@@ -69,15 +74,17 @@ class GGP(GPFLOWGGP):
         t = trange(self.epochs)
         for step in t:
             elbo = -training_step(
-                idx_train, node_labels[idx_train], optimizer,
-                gprocess)
+                idx_train, node_labels[idx_train], optimizer, gprocess
+            )
 
             if step % 200 == 0:
-                t.set_postfix({'ELBO': elbo.numpy()})
+                t.set_postfix({"ELBO": elbo.numpy()})
 
         self.model = gprocess
 
-    def _predict(self, data: Data) -> Tuple[np.array, np.array]:
+    def _predict(
+        self, data: Data
+    ) -> Tuple[gpflow.base.TensorType, gpflow.base.TensorType]:
         x_id_all = torch.arange(data.x.size(0)).double().view(-1, 1).cpu().numpy()
         x_id_all = tf.constant(x_id_all)
         mean, var = self.model.predict_y(x_id_all)

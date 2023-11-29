@@ -16,6 +16,7 @@ class RGCN(Model):
 
     def __init__(self, params: ModelConfiguration):
         super().__init__(params)
+        assert isinstance(params.dim_hidden, int)
         gamma = params.gamma
 
         self.beta_kl = params.beta_kl
@@ -114,7 +115,7 @@ class RGCN(Model):
 
         return {'L2': self.beta_reg * norm2}
 
-    def get_optimizer(self, lr: float, weight_decay: float) -> Tuple[optim.Adam, optim.Adam]:
+    def get_optimizer(self, lr: float, weight_decay: float) -> Tuple[optim.Adam, optim.Adam | None]:
         optimizer = optim.Adam(
             [{'params': self.gaussian_1.parameters(), 'weight_decay': 0.0},
              {'params': self.gaussian_2.parameters(), 'weight_decay': 0.0}],

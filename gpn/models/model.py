@@ -17,7 +17,7 @@ from gpn.utils import Storage, ModelNotFoundError
 class Model(nn.Module):
     """base model which provides functionality to load and store models, compute losses, specify matching optimizers, and much more"""
 
-    def __init__(self, params: ModelConfiguration):
+    def __init__(self, params: ModelConfiguration | None):
         super().__init__()
         self._expects_training = True
         self._is_warming_up = False
