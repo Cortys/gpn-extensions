@@ -96,7 +96,7 @@ class Model(nn.Module):
 
     def CE_loss(self, prediction: Prediction, data: Data, reduction='mean') -> Dict[str, torch.Tensor]:
         y_hat: torch.Tensor = prediction.log_soft
-        y_hat, y: torch.Tensor = apply_mask(data, y_hat, split='train') # type: ignore
+        y_hat, y = apply_mask(data, y_hat, split='train') # type: ignore
 
         return {
             'CE': F.nll_loss(y_hat, y, reduction=reduction)
