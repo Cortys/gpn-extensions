@@ -332,7 +332,7 @@ class TransductiveGraphEngine(Engine):
         else:
             loss_train = loss(y_hat, data)
 
-        loss = torch.Tensor(0.0)
+        loss = torch.tensor(0.0, device=self.device)
         loss_dict = {}
         for l_key, l_val in loss_train.items():
             loss += l_val

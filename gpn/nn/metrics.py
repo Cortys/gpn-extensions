@@ -257,10 +257,10 @@ def _ood_detection(
     Returns:
         Tensor: APR/AUROC scores
     """
-    y_hat_t: Tensor = getattr(y_hat, key)
-    y_hat_ood_t: Tensor = getattr(y_hat_ood, key)
+    y_hat_t: Tensor | None = getattr(y_hat, key)
+    y_hat_ood_t: Tensor | None = getattr(y_hat_ood, key)
 
-    if (y_hat is not None) and (y_hat_ood is not None):
+    if (y_hat_t is not None) and (y_hat_ood_t is not None):
         scores = y_hat_t.cpu().detach().numpy()
         ood_scores = y_hat_ood_t.cpu().detach().numpy()
 
