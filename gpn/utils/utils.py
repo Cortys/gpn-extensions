@@ -1,5 +1,6 @@
 import os
 from typing import Union, Any, Tuple
+import pandas as pd
 from sacred.observers import SlackObserver
 import random
 import collections.abc
@@ -34,7 +35,6 @@ def map_tensor(tensor: Tensor, mapping: dict):
     return tensor
 
 
-
 def __apply(v: Tensor, m: Tensor) -> Tensor:
     """internal function to apply a mask to a tensor or value"""
 
@@ -59,12 +59,14 @@ def strip_prefix(string: str, prefix: str) -> str:
     """
 
     if string.startswith(prefix):
-        return string[len(prefix):]
+        return string[len(prefix) :]
 
     return string
 
 
-def _apply_mask(y_hat: Union[dict, Tensor, Prediction], mask: Tensor) -> Union[dict, Tensor, Prediction]:
+def _apply_mask(
+    y_hat: Union[dict, Tensor, Prediction], mask: Tensor
+) -> Union[dict, Tensor, Prediction]:
     """applies a mask to a representation of a model's predictions
 
     Args:
@@ -85,7 +87,7 @@ def _apply_mask(y_hat: Union[dict, Tensor, Prediction], mask: Tensor) -> Union[d
         _y_hat = __apply(y_hat, mask)
 
     elif isinstance(y_hat, Prediction):
-        y_hat_dict: dict[str, Any] = _apply_mask(y_hat.to_dict(), mask) # type: ignore
+        y_hat_dict: dict[str, Any] = _apply_mask(y_hat.to_dict(), mask)  # type: ignore
         _y_hat = Prediction(**y_hat_dict)
 
     else:
@@ -94,8 +96,14 @@ def _apply_mask(y_hat: Union[dict, Tensor, Prediction], mask: Tensor) -> Union[d
     return _y_hat
 
 
-def apply_mask(data: Data, y_hat: Union[dict, Tensor, Prediction], split: str,
-               return_target: bool = True) -> Union[Union[dict, Tensor, Prediction], Tuple[Union[dict, Tensor, Prediction], Tensor]]:
+def apply_mask(
+    data: Data,
+    y_hat: Union[dict, Tensor, Prediction],
+    split: str,
+    return_target: bool = True,
+) -> Union[
+    Union[dict, Tensor, Prediction], Tuple[Union[dict, Tensor, Prediction], Tensor]
+]:
     """applies a specified split/mask to model's predictions
 
     Args:
@@ -111,45 +119,45 @@ def apply_mask(data: Data, y_hat: Union[dict, Tensor, Prediction], split: str,
         Union[Union[dict, Tensor, Prediction], Tuple[Union[dict, Tensor, Prediction], Tensor]]: predictions (and ground-truth labels) after applying mask
     """
 
-    if split == 'train':
+    if split == "train":
         mask = data.train_mask
 
-    elif split == 'val':
+    elif split == "val":
         mask = data.val_mask
 
-    elif split == 'test':
+    elif split == "test":
         mask = data.test_mask
 
-    elif split == 'ood':
+    elif split == "ood":
         mask = data.ood_mask
 
-    elif split == 'id':
+    elif split == "id":
         mask = data.id_mask
 
-    elif split == 'ood_val':
+    elif split == "ood_val":
         mask = data.ood_val_mask
 
-    elif split == 'ood_test':
+    elif split == "ood_test":
         mask = data.ood_test_mask
 
-    elif split == 'ood_train':
+    elif split == "ood_train":
         # not intended as mask
         # for not breaking pipeline: empty mask
         mask = torch.zeros_like(data.y, dtype=torch.bool)
 
-    elif split == 'id_val':
+    elif split == "id_val":
         mask = data.id_val_mask
 
-    elif split == 'id_test':
+    elif split == "id_test":
         mask = data.id_test_mask
 
-    elif split == 'id_train':
+    elif split == "id_train":
         # not intended as mask
         # for not breaking pipeline: empty mask
         mask = torch.zeros_like(data.y, dtype=torch.bool)
 
     else:
-        raise NotImplementedError(f'split {split} is not implemented!')
+        raise NotImplementedError(f"split {split} is not implemented!")
 
     _y_hat = _apply_mask(y_hat, mask)
 
@@ -180,7 +188,7 @@ def to_one_hot(targets: Tensor, num_classes: int) -> Tensor:
 
 def recursive_update(d: dict, u: collections.abc.Mapping):
     """recursively update a dictionary d with might contain nested sub-dictionarieswith values from u"""
-    
+
     for k, v in u.items():
         if isinstance(v, collections.abc.Mapping):
             d[k] = recursive_update(d[k], v)
@@ -239,3 +247,21 @@ def set_seed(seed: int) -> None:
     np.random.seed(seed)
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
+
+
+def results_dict_to_df(results: dict) -> pd.DataFrame:
+    metrics = [m[4:] for m in results.keys() if m.startswith("val_")]
+    result_values = {"val": [], "test": []}
+
+    for s in ("val", "test"):
+        for m in metrics:
+            key = f"{s}_{m}"
+            if key in results:
+                val = results[key]
+                if isinstance(val, list):
+                    val = np.mean(val)
+                result_values[s].append(val)
+            else:
+                result_values[s].append(None)
+
+    return pd.DataFrame(data=result_values, index=metrics)

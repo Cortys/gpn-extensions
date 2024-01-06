@@ -55,6 +55,33 @@ def uce_loss(
     uce = a_sum.digamma() - a_true.digamma() 
     return loss_reduce(uce, reduction=reduction)
 
+def mixture_uce_loss(
+    alpha: torch.Tensor,
+    mixture_weights: torch.Tensor,
+    y: torch.Tensor,
+    reduction: str = 'sum'
+) -> torch.Tensor:
+    """utility function computing uncertainty cross entropy for a mixture of Dirichlet distributions
+
+    Args:
+        alpha (torch.Tensor): parameters of Dirichlet distribution
+        mixture_weights (torch.Tensor): mixture weights
+        y (torch.Tensor): grund-truth class labels (not one-hot encoded)
+        reduction (str, optional): reduction method. Defaults to 'sum'.
+
+    Returns:
+        torch.Tensor: loss
+    """
+    N = alpha.size(0)
+    a_sum = alpha.sum(-1)
+    sum_dg = a_sum.digamma()
+    mix_sum_dg = mixture_weights @ sum_dg
+
+    dg = alpha.digamma()
+    mix_dg = mixture_weights @ dg
+    mix_true_dg = mix_dg.gather(-1, y.view(-1, 1)).squeeze(-1)
+    uce = mix_sum_dg - mix_true_dg
+    return loss_reduce(uce, reduction=reduction)
 
 def entropy_reg(
         alpha: torch.Tensor,
@@ -82,6 +109,27 @@ def entropy_reg(
 
     return -beta_reg * reg
 
+def categorical_entropy_reg(
+    probs: torch.Tensor,
+    beta_reg: float,
+    reduction: str = 'sum'
+) -> torch.Tensor:
+    """calculates categorical entropy regularizer
+
+    Args:
+        probs (torch.Tensor): categorical probabilities
+        beta_reg (float): regularization factor
+        reduction (str, optional): loss reduction. Defaults to 'sum'.
+        
+    Returns:
+        torch.Tensor: REG
+    """
+    
+    reg = D.Categorical(probs).entropy()
+    
+    reg = loss_reduce(reg, reduction=reduction)
+    
+    return -beta_reg * reg
 
 def uce_loss_and_reg(
         alpha: torch.Tensor,

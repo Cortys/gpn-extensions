@@ -184,7 +184,7 @@ class TransductiveExperiment:
 
         return results
 
-    def train(self)-> History | None:
+    def train(self) -> History | None:
         assert self.model is not None
         if not self.model.expects_training():
             return None

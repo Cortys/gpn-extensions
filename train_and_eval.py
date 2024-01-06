@@ -1,5 +1,6 @@
 import os
 from typing import OrderedDict
+
 os.environ['MKL_THREADING_LAYER'] = 'GNU'
 
 import logging
@@ -11,6 +12,7 @@ from collections import OrderedDict
 from sacred import Experiment
 from gpn.utils import RunConfiguration, DataConfiguration
 from gpn.utils import ModelConfiguration, TrainingConfiguration
+from gpn.utils import results_dict_to_df
 from gpn.experiments import MultipleRunExperiment
 
 
@@ -63,24 +65,9 @@ def run_experiment(run: dict, data: dict, model: dict, training: dict) -> dict:
     experiment = MultipleRunExperiment(run_cfg, data_cfg, model_cfg, train_cfg, ex=ex)
     
     results = experiment.run()
-
-
-    metrics = [m[4:] for m in results.keys() if m.startswith('val_')]
-    result_values = {'val': [], 'test': []}
+    df = results_dict_to_df(results)
     
-    for s in ('val', 'test'):
-        for m in metrics:
-            key = f'{s}_{m}'
-            if key in results:
-                val = results[key]
-                if isinstance(val, list):
-                    val = np.mean(val)
-                result_values[s].append(val)
-            else:
-                result_values[s].append(None)
-
     print()
-    df = pd.DataFrame(data=result_values, index=metrics)
     print(df.to_markdown())
     print()
 

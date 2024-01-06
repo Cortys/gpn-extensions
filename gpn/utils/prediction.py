@@ -21,6 +21,9 @@ class Prediction(HalfFrozenObject):
     # alpha prediction
     alpha: torch.Tensor = attr.ib(default=None)
     alpha_features: torch.Tensor = attr.ib(default=None)
+    
+    # propagation weights
+    propagation_weights: torch.Tensor = attr.ib(default=None)
 
     # hidden / latent variables
     x_hat: torch.Tensor = attr.ib(default=None)

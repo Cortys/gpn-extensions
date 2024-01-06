@@ -8,4 +8,5 @@ from .metrics import confidence, ood_detection
 from .metrics import bin_predictions
 from .metrics import average_entropy, average_confidence
 from .loss import uce_loss, cross_entropy, uce_loss_and_reg, entropy_reg
+from .loss import mixture_uce_loss, categorical_entropy_reg
 from .loss import bayesian_risk_sosq, loss_reduce
