@@ -54,6 +54,7 @@ class TransductiveExperiment:
             'avg_prediction_confidence_epistemic',
             'avg_sample_confidence_aleatoric',
             'avg_sample_confidence_epistemic',
+            'avg_sample_confidence_epistemic_entropy',
             'avg_sample_confidence_features',
             'avg_sample_confidence_neighborhood',
             'average_entropy'
@@ -65,6 +66,8 @@ class TransductiveExperiment:
             'ood_detection_aleatoric_auroc',
             'ood_detection_epistemic_apr',
             'ood_detection_epistemic_auroc',
+            'ood_detection_epistemic_entropy_apr',
+            'ood_detection_epistemic_entropy_auroc',
             'ood_detection_features_apr',
             'ood_detection_features_auroc',
             'ood_detection_neighborhood_apr',
@@ -77,6 +80,7 @@ class TransductiveExperiment:
             'ood_avg_prediction_confidence_epistemic',
             'ood_avg_sample_confidence_aleatoric',
             'ood_avg_sample_confidence_epistemic',
+            'ood_avg_sample_confidence_epistemic_entropy',
             'ood_avg_sample_confidence_neighborhood',
             'ood_avg_sample_confidence_features',
             'ood_average_entropy',
@@ -86,6 +90,7 @@ class TransductiveExperiment:
             'id_avg_prediction_confidence_epistemic',
             'id_avg_sample_confidence_aleatoric',
             'id_avg_sample_confidence_epistemic',
+            'id_avg_sample_confidence_epistemic_entropy',
             'id_avg_sample_confidence_features',
             'id_average_entropy',
         ]

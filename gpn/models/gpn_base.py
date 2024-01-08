@@ -111,6 +111,8 @@ class GPN(Model):
 
         max_soft, hard = soft.max(dim=-1)
 
+        neg_entropy = entropy_reg(alpha_features, 1, approximate=True, reduction="none")
+
         # ---------------------------------------------------------------------------------
         pred = Prediction(
             # predictions and intermediary scores
@@ -133,6 +135,7 @@ class GPN(Model):
             # sample confidence scores
             sample_confidence_aleatoric=max_soft,
             sample_confidence_epistemic=alpha.sum(-1),
+            sample_confidence_epistemic_entropy=neg_entropy,
             sample_confidence_features=alpha_features.sum(-1),
             sample_confidence_structure=None,
         )
@@ -197,11 +200,19 @@ class GPN(Model):
     def uce_loss(
         self, prediction: Prediction, data: Data, approximate=True
     ) -> Tuple[torch.Tensor, torch.Tensor]:
-        alpha_train, y = apply_mask(data, prediction.alpha, split="train") # type: ignore
+        masked_pred: dict[str, torch.Tensor]
+        masked_pred, y = apply_mask(
+            data,
+            dict(
+                alpha_train=prediction.alpha,
+                entropy_train=prediction.sample_confidence_epistemic_entropy,
+            ),
+            split="train",
+        )  # type: ignore
+        alpha_train = masked_pred["alpha_train"]
+        entropy_train = masked_pred["entropy_train"]
         reg = self.params.entropy_reg
-        return uce_loss(alpha_train, y, reduction="sum"), entropy_reg( # type: ignore
-            alpha_train, reg, approximate=approximate, reduction="sum" # type: ignore
-        )
+        return uce_loss(alpha_train, y, reduction="sum"), reg * entropy_train.sum()
 
     def loss(self, prediction: Prediction, data: Data) -> Dict[str, torch.Tensor]:
         uce, reg = self.uce_loss(prediction, data)

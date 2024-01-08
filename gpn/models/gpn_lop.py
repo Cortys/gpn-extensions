@@ -1,4 +1,5 @@
 from typing import Dict, Tuple, List
+from sklearn import mixture
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -52,10 +53,16 @@ class GPN_LOP(GPN):
 
         max_soft, hard = soft.max(dim=-1)
 
+        neg_entropy_features = entropy_reg(alpha_features, 1, approximate=True, reduction="none")
+        neg_entropy = propagation_weights @ neg_entropy_features
+        neg_entropy = neg_entropy + categorical_entropy_reg(
+            propagation_weights, 1, reduction="none"
+        )
+
         # ---------------------------------------------------------------------------------
         pred = Prediction(
             # predictions and intermediary scores
-            alpha=alpha,
+            alpha=alpha,  # this alpha is not meaningful, since LOP produces a mixture of Dirichlet distributions
             alpha_features=alpha_features,
             propagation_weights=propagation_weights,
             soft=soft,
@@ -76,6 +83,7 @@ class GPN_LOP(GPN):
             # sample confidence scores
             sample_confidence_aleatoric=max_soft,
             sample_confidence_epistemic=alpha.sum(-1),
+            sample_confidence_epistemic_entropy=neg_entropy,
             sample_confidence_features=alpha_features.sum(-1),
             sample_confidence_structure=None,
         )
@@ -87,20 +95,19 @@ class GPN_LOP(GPN):
         self, prediction: Prediction, data: Data, approximate=True
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         alpha_features = prediction.alpha_features
-        mixture_weights: torch.Tensor
-        mixture_weights, y = apply_mask(
+        masked_pred: dict[str, torch.Tensor]
+        masked_pred, y = apply_mask(
             data,
-            prediction.propagation_weights,
+            dict(
+                mixture_weights=prediction.propagation_weights,
+                neg_entropy=prediction.sample_confidence_epistemic_entropy,
+            ),
             split="train",
-        ) # type: ignore
+        )  # type: ignore
+        mixture_weights = masked_pred["mixture_weights"]
+        neg_entropy = masked_pred["neg_entropy"]
         reg = self.params.entropy_reg
 
         uce = mixture_uce_loss(alpha_features, mixture_weights, y, reduction="sum")
-
-        reg_loss = entropy_reg(
-            alpha_features, reg, approximate=approximate, reduction="none"
-        )
-        reg_loss = (mixture_weights @ reg_loss).sum()
-        cat_reg_loss = categorical_entropy_reg(mixture_weights, reg, reduction="sum")
-
-        return uce, reg_loss + cat_reg_loss
+        reg_loss = reg * neg_entropy.sum()
+        return uce, reg_loss

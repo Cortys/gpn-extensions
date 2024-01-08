@@ -75,6 +75,7 @@ class Prediction(HalfFrozenObject):
     # scores for sample confidence
     sample_confidence_aleatoric: torch.Tensor = attr.ib(default=None)
     sample_confidence_epistemic: torch.Tensor | None = attr.ib(default=None)
+    sample_confidence_epistemic_entropy: torch.Tensor | None = attr.ib(default=None)
     sample_confidence_structure: torch.Tensor | None = attr.ib(default=None)
     sample_confidence_features: torch.Tensor | None = attr.ib(default=None)
     sample_confidence_neighborhood: torch.Tensor = attr.ib(default=None)
