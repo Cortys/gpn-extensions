@@ -251,6 +251,9 @@ def set_seed(seed: int) -> None:
 
 def results_dict_to_df(results: dict) -> pd.DataFrame:
     metrics = [m[4:] for m in results.keys() if m.startswith("val_")]
+    metrics_names = [
+        (m[:-4] + "_var" if m.endswith("_val") else m) for m in metrics
+    ]
     result_values = {"val": [], "test": []}
 
     for s in ("val", "test"):
@@ -259,9 +262,12 @@ def results_dict_to_df(results: dict) -> pd.DataFrame:
             if key in results:
                 val = results[key]
                 if isinstance(val, list):
-                    val = np.mean(val)
+                    if m.endswith("_val"):
+                        val = np.var(val)
+                    else:
+                        val = np.mean(val)
                 result_values[s].append(val)
             else:
                 result_values[s].append(None)
 
-    return pd.DataFrame(data=result_values, index=metrics)
+    return pd.DataFrame(data=result_values, index=metrics_names)
