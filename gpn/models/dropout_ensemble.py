@@ -67,7 +67,7 @@ class DropoutEnsemble(Model):
 
         return pred
 
-    def _set_dropout_train(self, do_train: bool) -> False:
+    def _set_dropout_train(self, do_train: bool) -> None:
         # Ensures that all dropout nodes drop neurons
         for module in self.model.modules():
             if isinstance(module, nn.Dropout):
