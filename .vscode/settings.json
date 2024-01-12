@@ -1,0 +1,15 @@
+{
+    "python.analysis.typeCheckingMode": "basic",
+    "python.analysis.autoImportCompletions": true,
+    "calva.replConnectSequences": [{
+            "name": "Dev REPL",
+            "projectType": "custom",
+            "autoSelectForJackIn": true,
+            "projectRootPath": [
+                "."
+            ],
+            "customJackInCommandLine": "poetry run bb --nrepl-server JACK-IN-NREPL-PORT"
+        }
+    ],
+    "calva.redirectServerOutputToRepl": true
+}

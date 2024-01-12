@@ -1,0 +1,2 @@
+{:paths ["."]
+ :deps {cli-matic/cli-matic {:mvn/version "0.5.4"}}}

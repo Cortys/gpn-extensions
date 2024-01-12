@@ -1,5 +1,4 @@
 .ipynb_checkpoints
-.vscode
 **/__pycache__/**
 
 *.pyc
@@ -13,3 +12,5 @@ data/**
 gpn.egg-info
 .portal
 .cache
+.clj-kondo
+.calva

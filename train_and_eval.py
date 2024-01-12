@@ -1,7 +1,10 @@
 import os
 from typing import OrderedDict
+import warnings
 
-os.environ['MKL_THREADING_LAYER'] = 'GNU'
+from sklearn.exceptions import UndefinedMetricWarning
+
+os.environ["MKL_THREADING_LAYER"] = "GNU"
 
 import logging
 import torch
@@ -18,10 +21,12 @@ from gpn.experiments import MultipleRunExperiment
 
 ex = Experiment()
 
+warnings.filterwarnings("ignore", category=UndefinedMetricWarning)
+
 
 @ex.config
 def config():
-    #pylint: disable=missing-function-docstring
+    # pylint: disable=missing-function-docstring
     overwrite = None
     db_collection = None
 
@@ -48,25 +53,25 @@ def run_experiment(run: dict, data: dict, model: dict, training: dict) -> dict:
     if torch.cuda.device_count() <= 0:
         run_cfg.set_values(gpu=False)
 
-    logging.info('Received the following configuration:')
-    logging.info('RUN')
+    logging.info("Received the following configuration:")
+    logging.info("RUN")
     logging.info(run_cfg.to_dict())
-    logging.info('-----------------------------------------')
-    logging.info('DATA')
+    logging.info("-----------------------------------------")
+    logging.info("DATA")
     logging.info(data_cfg.to_dict())
-    logging.info('-----------------------------------------')
-    logging.info('MODEL')
+    logging.info("-----------------------------------------")
+    logging.info("MODEL")
     logging.info(model_cfg.to_dict())
-    logging.info('-----------------------------------------')
-    logging.info('TRAINING')
+    logging.info("-----------------------------------------")
+    logging.info("TRAINING")
     logging.info(train_cfg.to_dict())
-    logging.info('-----------------------------------------')
+    logging.info("-----------------------------------------")
 
     experiment = MultipleRunExperiment(run_cfg, data_cfg, model_cfg, train_cfg, ex=ex)
-    
+
     results = experiment.run()
     df = results_dict_to_df(results)
-    
+
     print()
     print(df.to_markdown())
     print()
