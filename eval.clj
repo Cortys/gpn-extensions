@@ -8,7 +8,7 @@
   (:import [clojure.lang ExceptionInfo]))
 
 (def default-splits {:run.num_inits 10
-                     :run.num_splits 10})
+                     :run.num_splits 1})
 (def datasets
   {"CoraML" default-splits
    "AmazonPhotos" default-splits
