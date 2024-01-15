@@ -1,4 +1,5 @@
 from typing import Optional, Tuple
+from numpy import isin
 
 from torch import Tensor
 import torch.nn.functional as F
@@ -23,8 +24,8 @@ class APPNPPropagation(MessagePassing):
         dropout: float = 0.0,
         cached: bool = False,
         add_self_loops: bool = True,
-        normalization: str = "sym",
-        **kwargs
+        normalization: str | None = "sym",
+        **kwargs,
     ):
         kwargs.setdefault("aggr", "add")
         super().__init__(**kwargs)
@@ -44,8 +45,8 @@ class APPNPPropagation(MessagePassing):
         self._cached_adj_t = None
 
     def forward(
-        self, x: Tensor, edge_index: Adj, edge_weight: OptTensor = None
-    ) -> Tensor:
+        self, x: Tensor | SparseTensor, edge_index: Adj, edge_weight: OptTensor = None
+    ) -> Tensor | SparseTensor:
         """"""
         if self.normalization is not None:
             if isinstance(edge_index, Tensor):
@@ -85,8 +86,13 @@ class APPNPPropagation(MessagePassing):
                 else:
                     edge_index = cache  # type: ignore
 
-        h = x
+        if isinstance(x, SparseTensor):
+            h = x.set_value(x.storage.value() * self.alpha)  # type: ignore
+        else:
+            h = self.alpha * x
 
+        print("prop")
+        print(edge_index.sum(1))  # type: ignore
         for _ in range(self.K):
             if self.dropout > 0 and self.training:
                 if isinstance(edge_index, Tensor):
@@ -96,15 +102,20 @@ class APPNPPropagation(MessagePassing):
                     value = edge_index.storage.value()  # type: ignore
                     assert value is not None
                     value = F.dropout(value, p=self.dropout)
-                    edge_index = edge_index.set_value(value, layout="coo") # type: ignore
+                    edge_index = edge_index.set_value(value, layout="coo")  # type: ignore
                 else:
                     raise TypeError(f"Invalid edge_index type {type(edge_index)}.")
 
+            print(edge_index)
+            print(edge_weight)
             # propagate_type: (x: Tensor, edge_weight: OptTensor)
             x = self.propagate(edge_index, x=x, edge_weight=edge_weight, size=None)
 
-            x = x * (1 - self.alpha)
-            x += self.alpha * h
+            if isinstance(x, SparseTensor):
+                x = x.set_value(x.storage.value() * (1 - self.alpha)) + h  # type: ignore
+            else:
+                x = x * (1 - self.alpha)
+                x += h
 
         return x
 

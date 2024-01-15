@@ -43,6 +43,9 @@ class GPN_LOP(GPN):
         propagation_weights = self.propagation(
             torch.diag(torch.ones(N)).to(data.x.device), edge_index
         )
+        print(propagation_weights.min())
+        print(propagation_weights.max())
+        print(propagation_weights.sum(-1))
         evidence_ft = beta_ft.sum(-1)
         evidence = propagation_weights @ evidence_ft
         alpha = propagation_weights @ alpha_features
@@ -60,7 +63,6 @@ class GPN_LOP(GPN):
         )
 
         # ---------------------------------------------------------------------------------
-        pred = Prediction(
             # predictions and intermediary scores
             alpha=alpha,  # this alpha is not meaningful, since LOP produces a mixture of Dirichlet distributions
             alpha_features=alpha_features,
