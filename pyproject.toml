@@ -54,6 +54,11 @@ ipywidgets = "^8.1.1"
 pyright = "^1.1.337"
 types-tensorflow = "^2.12.0.10"
 
+[tool.pyright]
+include = ["gpn", "pyblaze"]
+pythonVersion = "3.10"
+pythonPlatform = "Linux"
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
