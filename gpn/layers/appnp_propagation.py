@@ -1,4 +1,5 @@
 from typing import Optional, Tuple
+from networkx import edge_expansion
 from numpy import isin
 
 from torch import Tensor
@@ -25,6 +26,7 @@ class APPNPPropagation(MessagePassing):
         cached: bool = False,
         add_self_loops: bool = True,
         normalization: str | None = "sym",
+        sparse_x_prune_threshold: float = 0.01,
         **kwargs,
     ):
         kwargs.setdefault("aggr", "add")
@@ -34,8 +36,10 @@ class APPNPPropagation(MessagePassing):
         self.dropout = dropout
         self.cached = cached
         self.add_self_loops = add_self_loops
-        assert normalization in ("sym", "rw", "in-degree", "out-degree", None)
+        assert normalization in (
+            "sym", "rw", "in-degree", "out-degree", "in-degree-sym", "sym-var", None)
         self.normalization = normalization
+        self.sparse_x_prune_threshold = sparse_x_prune_threshold
 
         self._cached_edge_index = None
         self._cached_adj_t = None
@@ -52,13 +56,14 @@ class APPNPPropagation(MessagePassing):
             if isinstance(edge_index, Tensor):
                 cache = self._cached_edge_index
                 if cache is None:
+                    x_dtype = x.dtype() if isinstance(x, SparseTensor) else x.dtype
                     edge_index, edge_weight = mat_norm(
                         edge_index,
                         edge_weight,
                         x.size(self.node_dim),
                         improved=False,
                         add_self_loops=self.add_self_loops,
-                        dtype=x.dtype,
+                        dtype=x_dtype,
                         normalization=self.normalization,
                     )  # type: ignore
 
@@ -71,13 +76,14 @@ class APPNPPropagation(MessagePassing):
             elif isinstance(edge_index, SparseTensor):
                 cache = self._cached_adj_t
                 if cache is None:
+                    x_dtype = x.dtype() if isinstance(x, SparseTensor) else x.dtype
                     edge_index = mat_norm(
                         edge_index,
                         edge_weight,
                         x.size(self.node_dim),
                         improved=False,
                         add_self_loops=self.add_self_loops,
-                        dtype=x.dtype,
+                        dtype=x_dtype,
                         normalization=self.normalization,
                     )  # type: ignore
 
@@ -91,8 +97,6 @@ class APPNPPropagation(MessagePassing):
         else:
             h = self.alpha * x
 
-        print("prop")
-        print(edge_index.sum(1))  # type: ignore
         for _ in range(self.K):
             if self.dropout > 0 and self.training:
                 if isinstance(edge_index, Tensor):
@@ -106,8 +110,6 @@ class APPNPPropagation(MessagePassing):
                 else:
                     raise TypeError(f"Invalid edge_index type {type(edge_index)}.")
 
-            print(edge_index)
-            print(edge_weight)
             # propagate_type: (x: Tensor, edge_weight: OptTensor)
             x = self.propagate(edge_index, x=x, edge_weight=edge_weight, size=None)
 

@@ -132,6 +132,7 @@ def mat_norm(
             num_nodes=num_nodes,
             add_self_loops=add_self_loops,
             dtype=dtype,
+            normalization=normalization
         )
 
     if normalization in ("in-degree-sym", "sym-var"):
@@ -182,17 +183,17 @@ def deg_norm(
 
         if normalization == "in-degree":
             in_deg = sum(adj_t, dim=0)
-            in_deg_inv_sqrt = in_deg.pow_(-0.5)
-            in_deg_inv_sqrt.masked_fill_(in_deg_inv_sqrt == float("inf"), 0.0)
+            in_deg_inv = in_deg.pow_(-1)
+            in_deg_inv.masked_fill_(in_deg_inv == float("inf"), 0.0)
             # A = D_in^-1 * A
-            adj_t = mul(adj_t, in_deg_inv_sqrt.view(1, -1))
+            adj_t = mul(adj_t, in_deg_inv.view(1, -1))
 
         elif normalization in ("out-degree", "rw"):
             out_deg = sum(adj_t, dim=1)
-            out_deg_inv_sqrt = out_deg.pow_(-0.5)
-            out_deg_inv_sqrt.masked_fill_(out_deg_inv_sqrt == float("inf"), 0.0)
+            out_deg_inv = out_deg.pow_(-1)
+            out_deg_inv.masked_fill_(out_deg_inv == float("inf"), 0.0)
             # A = A * D_out^-1
-            adj_t = mul(adj_t, out_deg_inv_sqrt.view(-1, 1))
+            adj_t = mul(adj_t, out_deg_inv.view(-1, 1))
 
         else:
             raise AssertionError
