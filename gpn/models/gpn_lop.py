@@ -1,11 +1,13 @@
 from typing import Dict, Tuple, List
 from sklearn import mixture
+from sklearn.random_projection import SparseRandomProjection
 import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
 import torch_geometric.utils as tu
 from torch_geometric.data import Data
+from torch_sparse import SparseTensor
 from gpn.nn import mixture_uce_loss, entropy_reg, categorical_entropy_reg
 from gpn.utils import apply_mask
 from gpn.utils import Prediction
@@ -16,7 +18,11 @@ class GPN_LOP(GPN):
     """Graph Posterior Network model using linear opinion pooling instead of alpha parameter pooling, i.e., using a mixture of Dirichlet distributions."""
 
     def forward(self, data):
-        edge_index = data.edge_index if data.edge_index is not None else data.adj_t
+        N = data.x.size(0)
+        if data.edge_index is not None:
+            adj_t = SparseTensor.from_edge_index(data.edge_index, sparse_sizes=(N, N))
+        else:
+            adj_t = data.adj_t
         h = self.input_encoder(data.x)
         z = self.latent_encoder(h)
 
@@ -39,15 +45,13 @@ class GPN_LOP(GPN):
 
         alpha_features = 1.0 + beta_ft
 
-        N = data.x.size(0)
-        propagation_weights = self.propagation(
-            torch.diag(torch.ones(N)).to(data.x.device), edge_index
-        )
-        print(propagation_weights.min())
-        print(propagation_weights.max())
-        print(propagation_weights.sum(-1))
+        I = SparseTensor.eye(N, dtype=torch.float32, device=data.x.device)  # type: ignore
+
+        propagation_weights: SparseTensor = self.propagation(I, adj_t)
+        print("w", propagation_weights)
         evidence_ft = beta_ft.sum(-1)
-        evidence = propagation_weights @ evidence_ft
+        print("e", evidence_ft)
+        evidence = propagation_weights @ evidence_ft.view(-1, 1)
         alpha = propagation_weights @ alpha_features
 
         soft_ft = alpha_features / alpha_features.sum(-1, keepdim=True)
@@ -56,13 +60,17 @@ class GPN_LOP(GPN):
 
         max_soft, hard = soft.max(dim=-1)
 
-        neg_entropy_features = entropy_reg(alpha_features, 1, approximate=True, reduction="none")
-        neg_entropy = propagation_weights @ neg_entropy_features
+        neg_entropy_features = entropy_reg(
+            alpha_features, 1, approximate=True, reduction="none"
+        )
+        neg_entropy = (propagation_weights @ neg_entropy_features.view(-1, 1)).view(-1)
         neg_entropy = neg_entropy + categorical_entropy_reg(
-            propagation_weights, 1, reduction="none"
+            propagation_weights,
+            1, reduction="none"
         )
 
         # ---------------------------------------------------------------------------------
+        pred = Prediction(
             # predictions and intermediary scores
             alpha=alpha,  # this alpha is not meaningful, since LOP produces a mixture of Dirichlet distributions
             alpha_features=alpha_features,

@@ -1,13 +1,13 @@
 import torch
 import torch.nn.functional as F
 import torch.distributions as D
+from torch.distributions.utils import probs_to_logits
+from torch_sparse import SparseTensor
 import gpn.distributions as UD
 from gpn.utils import to_one_hot
 
 
-def loss_reduce(
-        loss: torch.Tensor,
-        reduction: str = 'sum') -> torch.Tensor:
+def loss_reduce(loss: torch.Tensor, reduction: str = "sum") -> torch.Tensor:
     """utility function to reduce raw losses
 
     Args:
@@ -18,22 +18,21 @@ def loss_reduce(
         torch.Tensor: reduced loss
     """
 
-    if reduction == 'sum':
+    if reduction == "sum":
         return loss.sum()
 
-    if reduction == 'mean':
+    if reduction == "mean":
         return loss.mean()
 
-    if reduction == 'none':
+    if reduction == "none":
         return loss
 
-    raise ValueError(f'{reduction} is not a valid value for reduction')
+    raise ValueError(f"{reduction} is not a valid value for reduction")
 
 
 def uce_loss(
-        alpha: torch.Tensor,
-        y: torch.Tensor,
-        reduction: str = 'sum') -> torch.Tensor:
+    alpha: torch.Tensor, y: torch.Tensor, reduction: str = "sum"
+) -> torch.Tensor:
     """utility function computing uncertainty cross entropy /
     bayesian risk of cross entropy
 
@@ -52,14 +51,15 @@ def uce_loss(
 
     a_sum = alpha.sum(-1)
     a_true = alpha.gather(-1, y.view(-1, 1)).squeeze(-1)
-    uce = a_sum.digamma() - a_true.digamma() 
+    uce = a_sum.digamma() - a_true.digamma()
     return loss_reduce(uce, reduction=reduction)
+
 
 def mixture_uce_loss(
     alpha: torch.Tensor,
     mixture_weights: torch.Tensor,
     y: torch.Tensor,
-    reduction: str = 'sum'
+    reduction: str = "sum",
 ) -> torch.Tensor:
     """utility function computing uncertainty cross entropy for a mixture of Dirichlet distributions
 
@@ -75,7 +75,7 @@ def mixture_uce_loss(
     N = alpha.size(0)
     a_sum = alpha.sum(-1)
     sum_dg = a_sum.digamma()
-    mix_sum_dg = mixture_weights @ sum_dg
+    mix_sum_dg = (mixture_weights @ sum_dg.view(-1, 1)).view(-1)
 
     dg = alpha.digamma()
     mix_dg = mixture_weights @ dg
@@ -83,11 +83,13 @@ def mixture_uce_loss(
     uce = mix_sum_dg - mix_true_dg
     return loss_reduce(uce, reduction=reduction)
 
+
 def entropy_reg(
-        alpha: torch.Tensor,
-        beta_reg: float,
-        approximate: bool = False,
-        reduction: str = 'sum') -> torch.Tensor:
+    alpha: torch.Tensor,
+    beta_reg: float,
+    approximate: bool = False,
+    reduction: str = "sum",
+) -> torch.Tensor:
     """calculates entopy regularizer
 
     Args:
@@ -109,10 +111,9 @@ def entropy_reg(
 
     return -beta_reg * reg
 
+
 def categorical_entropy_reg(
-    probs: torch.Tensor,
-    beta_reg: float,
-    reduction: str = 'sum'
+    probs: torch.Tensor | SparseTensor, beta_reg: float, reduction: str = "sum"
 ) -> torch.Tensor:
     """calculates categorical entropy regularizer
 
@@ -120,22 +121,29 @@ def categorical_entropy_reg(
         probs (torch.Tensor): categorical probabilities
         beta_reg (float): regularization factor
         reduction (str, optional): loss reduction. Defaults to 'sum'.
-        
+
     Returns:
         torch.Tensor: REG
     """
-    
-    reg = D.Categorical(probs).entropy()
-    
+
+    if isinstance(probs, SparseTensor):
+        p = probs.storage.value()
+        assert p is not None
+        min_real = torch.finfo(p.dtype).min
+        logits = torch.clamp(probs_to_logits(p), min=min_real)
+        p_log_p = logits * p
+        reg = -probs.set_value(p_log_p, "coo").sum(-1) # type: ignore
+    else:
+        reg = D.Categorical(probs).entropy()
+
     reg = loss_reduce(reg, reduction=reduction)
-    
+
     return -beta_reg * reg
 
+
 def uce_loss_and_reg(
-        alpha: torch.Tensor,
-        y: torch.Tensor,
-        beta_reg: float, 
-        reduction: str = 'sum') -> torch.Tensor:
+    alpha: torch.Tensor, y: torch.Tensor, beta_reg: float, reduction: str = "sum"
+) -> torch.Tensor:
     """calculates uncertain cross-entropy and entropy regularization at the same time
 
     Args:
@@ -148,17 +156,16 @@ def uce_loss_and_reg(
         torch.Tensor: UCE + REG
     """
 
-    uce = uce_loss(alpha, y, reduction='none')
-    reg = entropy_reg(alpha, beta_reg, reduction='none')
+    uce = uce_loss(alpha, y, reduction="none")
+    reg = entropy_reg(alpha, beta_reg, reduction="none")
 
     loss = uce + reg
     return loss_reduce(loss, reduction=reduction)
 
 
 def cross_entropy(
-        y_hat: torch.Tensor,
-        y: torch.Tensor,
-        reduction: str = 'mean') -> torch.Tensor:
+    y_hat: torch.Tensor, y: torch.Tensor, reduction: str = "mean"
+) -> torch.Tensor:
     """wrapper for cross-entropy loss
 
     Args:
@@ -175,9 +182,8 @@ def cross_entropy(
 
 
 def bayesian_risk_sosq(
-        alpha: torch.Tensor,
-        y: torch.Tensor,
-        reduction: str = 'sum') -> torch.Tensor:
+    alpha: torch.Tensor, y: torch.Tensor, reduction: str = "sum"
+) -> torch.Tensor:
     """bayesian-risk-loss of sum-of-squares
 
     Args:

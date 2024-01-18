@@ -3,6 +3,7 @@ from pyblaze.nn.callbacks.logging import PredictionProgressLogger
 
 import torch
 import attr
+from torch_sparse import SparseTensor
 from .object import HalfFrozenObject
 
 
@@ -21,9 +22,9 @@ class Prediction(HalfFrozenObject):
     # alpha prediction
     alpha: torch.Tensor = attr.ib(default=None)
     alpha_features: torch.Tensor = attr.ib(default=None)
-    
+
     # propagation weights
-    propagation_weights: torch.Tensor = attr.ib(default=None)
+    propagation_weights: torch.Tensor | SparseTensor = attr.ib(default=None)
 
     # hidden / latent variables
     x_hat: torch.Tensor = attr.ib(default=None)
@@ -108,6 +109,11 @@ class Prediction(HalfFrozenObject):
             if not isinstance(p_to_collate, (list, tuple)):
                 p_to_collate = [p_to_collate]
             p_val = [getattr(p, var_name) for p in p_to_collate]
+
+            if isinstance(var_val, SparseTensor):
+                print(var_name)
+                var_val = var_val.to_torch_sparse_coo_tensor()
+
             self.set_value(var_name, torch.cat([var_val, *p_val]))
 
         return self

@@ -93,7 +93,7 @@ class APPNPPropagation(MessagePassing):
                     edge_index = cache  # type: ignore
 
         if isinstance(x, SparseTensor):
-            h = x.set_value(x.storage.value() * self.alpha)  # type: ignore
+            h = x.set_value(x.storage.value() * self.alpha, "coo")  # type: ignore
         else:
             h = self.alpha * x
 
@@ -114,7 +114,7 @@ class APPNPPropagation(MessagePassing):
             x = self.propagate(edge_index, x=x, edge_weight=edge_weight, size=None)
 
             if isinstance(x, SparseTensor):
-                x = x.set_value(x.storage.value() * (1 - self.alpha)) + h  # type: ignore
+                x = x.set_value(x.storage.value() * (1 - self.alpha), "coo") + h  # type: ignore
             else:
                 x = x * (1 - self.alpha)
                 x += h
