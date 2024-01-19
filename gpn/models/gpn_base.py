@@ -1,4 +1,6 @@
 from typing import Dict, Tuple, List
+
+from scipy import sparse
 from gpn.utils.config import ModelConfiguration
 import torch
 import torch.nn as nn
@@ -16,6 +18,8 @@ from .model import Model
 
 class GPN(Model):
     """Graph Posterior Network model"""
+
+    default_normalization = "sym"
 
     def __init__(self, params: ModelConfiguration):
         super().__init__(params)
@@ -58,13 +62,7 @@ class GPN(Model):
 
         self.evidence = Evidence(scale=self.params.alpha_evidence_scale)  # type: ignore
 
-        self.propagation = APPNPPropagation(
-            K=self.params.K,
-            alpha=self.params.alpha_teleport,
-            add_self_loops=self.params.add_self_loops,
-            cached=False,
-            normalization="sym",
-        )
+        self.init_propagation()
 
         assert self.params.pre_train_mode in ("encoder", "flow", None)
         assert self.params.likelihood_type in (
@@ -73,6 +71,24 @@ class GPN(Model):
             "nll_train_and_val",
             "nll_consistency",
             None,
+        )
+
+    def init_propagation(self):
+        normalization = self.params.adj_normalization
+        if normalization is None:
+            normalization = self.default_normalization
+
+        x_prune_threshold = self.params.sparse_x_prune_threshold
+        if x_prune_threshold is None:
+            x_prune_threshold = self.default_x_prune_threshold
+
+        self.propagation = APPNPPropagation(
+            K=self.params.K,
+            alpha=self.params.alpha_teleport,
+            add_self_loops=self.params.add_self_loops,
+            cached=False,
+            normalization=normalization,
+            sparse_x_prune_threshold=x_prune_threshold
         )
 
     def forward(self, data: Data) -> Prediction:

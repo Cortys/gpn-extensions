@@ -8,6 +8,7 @@ import torch.nn.functional as F
 import torch_geometric.utils as tu
 from torch_geometric.data import Data
 from torch_sparse import SparseTensor
+from gpn.layers.appnp_propagation import APPNPPropagation
 from gpn.nn import mixture_uce_loss, entropy_reg, categorical_entropy_reg
 from gpn.utils import apply_mask
 from gpn.utils import Prediction
@@ -16,6 +17,9 @@ from .gpn_base import GPN
 
 class GPN_LOP(GPN):
     """Graph Posterior Network model using linear opinion pooling instead of alpha parameter pooling, i.e., using a mixture of Dirichlet distributions."""
+
+    default_normalization = "rw"
+    default_x_prune_threshold = None
 
     def forward(self, data):
         N = data.x.size(0)
@@ -45,12 +49,13 @@ class GPN_LOP(GPN):
 
         alpha_features = 1.0 + beta_ft
 
-        I = SparseTensor.eye(N, dtype=torch.float32, device=data.x.device)  # type: ignore
+        if self.params.sparse_propagation:
+            I = SparseTensor.eye(N, dtype=torch.float32, device=data.x.device)  # type: ignore
+        else:
+            I = torch.eye(N, dtype=torch.float32, device=data.x.device)
 
-        propagation_weights: SparseTensor = self.propagation(I, adj_t)
-        print("w", propagation_weights)
+        propagation_weights: torch.Tensor | SparseTensor = self.propagation(I, adj_t)
         evidence_ft = beta_ft.sum(-1)
-        print("e", evidence_ft)
         evidence = propagation_weights @ evidence_ft.view(-1, 1)
         alpha = propagation_weights @ alpha_features
 
@@ -65,8 +70,7 @@ class GPN_LOP(GPN):
         )
         neg_entropy = (propagation_weights @ neg_entropy_features.view(-1, 1)).view(-1)
         neg_entropy = neg_entropy + categorical_entropy_reg(
-            propagation_weights,
-            1, reduction="none"
+            propagation_weights, 1, reduction="none"
         )
 
         # ---------------------------------------------------------------------------------

@@ -20,13 +20,18 @@ class RunConfiguration(HalfFrozenObject):
     #   default: e.g. ood evasion or re-evaluation
     #   dropout: i.e. DropoutEnsemble evaluation
     #   ensemble: i.e. Ensemble evaluation (using model-init 1-10!!!)
-    eval_mode: str = attr.ib(default=None, validator=lambda i, a, v: v in (
-        'default', 'dropout', 'ensemble', 'energy_scoring'))
+    eval_mode: str = attr.ib(
+        default=None,
+        validator=lambda i, a, v: v
+        in ("default", "dropout", "ensemble", "energy_scoring"),
+    )
 
     # flag whether to run a job as experiment ("train": training + evaluation)
     # or only in "evaluation" mode (e.g. re-evaluating model,
     # evlulating models on other datasets, or as dropout-models or ensembles)
-    job: str = attr.ib(default=None, validator=lambda i, a, v: v in ('train', 'evaluate'))
+    job: str = attr.ib(
+        default=None, validator=lambda i, a, v: v in ("train", "evaluate")
+    )
 
     # save-flag (e.g. for not saving GridSearch experiments)
     save_model: bool = attr.ib(default=None)
@@ -39,16 +44,24 @@ class RunConfiguration(HalfFrozenObject):
     num_splits: int = attr.ib(default=None)
 
     # running experiment
-    log: bool = attr.ib(default=True) # flag for logging training progress and metrics
-    debug: bool = attr.ib(default=True) # flag for running code in a "DEBUG" mode
-    ex_type: str = attr.ib(default='transductive', validator=lambda i, a, v: v in (
-        'transductive', 'transductive_ood')) # type: ignore
+    log: bool = attr.ib(default=True)  # flag for logging training progress and metrics
+    debug: bool = attr.ib(default=True)  # flag for running code in a "DEBUG" mode
+    ex_type: str = attr.ib(
+        default="transductive",
+        validator=lambda i, a, v: v in ("transductive", "transductive_ood"),
+    )  # type: ignore
 
-    ood_loc: bool = attr.ib(default=True) # flag for running LOC in ood_experiment
-    ood_loc_only: bool = attr.ib(default=False) # flag for only runninig LOC in ood_experiment
+    ood_loc: bool = attr.ib(default=True)  # flag for running LOC in ood_experiment
+    ood_loc_only: bool = attr.ib(
+        default=False
+    )  # flag for only runninig LOC in ood_experiment
 
-    ood_edge_perturbations: bool = attr.ib(default=True) # flag for running edge pert. exp. in ood_experiment
-    ood_isolated_perturbations: bool = attr.ib(default=False) # flag for running isolated exp. in ood_experiment
+    ood_edge_perturbations: bool = attr.ib(
+        default=True
+    )  # flag for running edge pert. exp. in ood_experiment
+    ood_isolated_perturbations: bool = attr.ib(
+        default=False
+    )  # flag for running isolated exp. in ood_experiment
 
 
 @attr.s(frozen=True)
@@ -59,12 +72,16 @@ class DataConfiguration(HalfFrozenObject):
     to_sparse: bool = attr.ib(default=False)
 
     # ranomness
-    split_no: int = attr.ib(default=None, validator=lambda i, a, v: v is not None and v > 0)
+    split_no: int = attr.ib(
+        default=None, validator=lambda i, a, v: v is not None and v > 0
+    )
 
     # dataset parameters
     dataset: str = attr.ib(default=None)
     root: str = attr.ib(default=None)
-    split: str = attr.ib(default=None, validator=lambda i, a, v: v in ('public', 'random'))
+    split: str = attr.ib(
+        default=None, validator=lambda i, a, v: v in ("public", "random")
+    )
     # note that either the num-examples for the size values
     # must be specified, but not both at the same time!
     train_samples_per_class: Union[int, float] = attr.ib(default=None)
@@ -76,11 +93,25 @@ class DataConfiguration(HalfFrozenObject):
 
     # ood parameters
     ood_flag: bool = attr.ib(default=False)
-    ood_setting: str = attr.ib(default=None, validator=lambda i, a, v: v in ('evasion', 'poisoning', None))
-    ood_type: str = attr.ib(default=None, validator=lambda i, a, v: v in (
-        None, 'perturb_features', 'leave_out_classes',
-        'leave_out_classes_evasion', 'random_attack_dice', 'random_attack_targeted', 'random_edge_perturbations'))
-    ood_dataset_type: str = attr.ib(default=None, validator=lambda i, a, v: v in ('budget', 'isolated', None))
+    ood_setting: str = attr.ib(
+        default=None, validator=lambda i, a, v: v in ("evasion", "poisoning", None)
+    )
+    ood_type: str = attr.ib(
+        default=None,
+        validator=lambda i, a, v: v
+        in (
+            None,
+            "perturb_features",
+            "leave_out_classes",
+            "leave_out_classes_evasion",
+            "random_attack_dice",
+            "random_attack_targeted",
+            "random_edge_perturbations",
+        ),
+    )
+    ood_dataset_type: str = attr.ib(
+        default=None, validator=lambda i, a, v: v in ("budget", "isolated", None)
+    )
     # type of feature perturabtion, e.g. bernoulli_0.5
     ood_perturbation_type: str = attr.ib(default=None)
     ood_budget_per_graph: float = attr.ib(default=None)
@@ -97,10 +128,14 @@ class ModelConfiguration(HalfFrozenObject):
     """object specifying possible model configurations"""
 
     # model name
-    model_name: str = attr.ib(default=None, validator=lambda i, a, v: v is not None and len(v) > 0)
+    model_name: str = attr.ib(
+        default=None, validator=lambda i, a, v: v is not None and len(v) > 0
+    )
     # randomness
     seed: int = attr.ib(default=None, validator=lambda i, a, v: v is not None and v > 0)
-    init_no: int = attr.ib(default=None, validator=lambda i, a, v: v is not None and v > 0)
+    init_no: int = attr.ib(
+        default=None, validator=lambda i, a, v: v is not None and v > 0
+    )
 
     # default parameters
     num_classes: int = attr.ib(default=None)
@@ -127,6 +162,9 @@ class ModelConfiguration(HalfFrozenObject):
     K: int = attr.ib(default=None)
     alpha_teleport: float = attr.ib(default=None)
     add_self_loops: bool = attr.ib(default=None)
+    adj_normalization: str = attr.ib(default=None)
+    sparse_propagation: bool = attr.ib(default=None)
+    sparse_x_prune_threshold: float = attr.ib(default=None)
 
     # PostNet / NormalizingFlows
     radial_layers: int = attr.ib(default=None)
@@ -141,14 +179,16 @@ class ModelConfiguration(HalfFrozenObject):
     factor_flow_lr: float = attr.ib(default=None)
     flow_weight_decay: float = attr.ib(default=None)
     share_flow: bool = attr.ib(default=None)
-    use_batched_flow: bool = attr.ib(default=None) 
-    pre_train_mode: str = attr.ib(default=None, validator=lambda i, a, v: v in ('encoder', 'flow', 'none', None))
+    use_batched_flow: bool = attr.ib(default=None)
+    pre_train_mode: str = attr.ib(
+        default=None, validator=lambda i, a, v: v in ("encoder", "flow", "none", None)
+    )
     likelihood_type: str = attr.ib(
         default=None,
-        validator=lambda i, a, v: v in ('UCE', 'nll_train', 'nll_train_and_val', 'nll_consistency', 'none', None))
-    gpn_loss_type: str = attr.ib(
-        default=None
+        validator=lambda i, a, v: v
+        in ("UCE", "nll_train", "nll_train_and_val", "nll_consistency", "none", None),
     )
+    gpn_loss_type: str = attr.ib(default=None)
 
     # Natural PostNets
     weight_evidence_transformation: str = attr.ib(default=None)
@@ -159,7 +199,9 @@ class ModelConfiguration(HalfFrozenObject):
     node_normalization: str = attr.ib(default=None)
     approximate_reg: bool = attr.ib(default=None)
     neighborhood_evidence: str = attr.ib(default=None)
-    loss_reduction: str = attr.ib(default=None, validator=lambda i, a, v: v in (None, 'sum', 'mean'))
+    loss_reduction: str = attr.ib(
+        default=None, validator=lambda i, a, v: v in (None, "sum", "mean")
+    )
     loss_nll_weight_with_classes: bool = attr.ib(default=None)
 
     # RGCN
@@ -183,7 +225,10 @@ class ModelConfiguration(HalfFrozenObject):
     use_bayesian_dropout: bool = attr.ib(default=None)
     use_kernel: bool = attr.ib(default=None)
     lambda_1: float = attr.ib(default=None)
-    sample_method: str = attr.ib(default=None, validator=lambda i, a, v: v in (None, 'log_evidence', 'alpha', 'none'))
+    sample_method: str = attr.ib(
+        default=None,
+        validator=lambda i, a, v: v in (None, "log_evidence", "alpha", "none"),
+    )
     epochs: int = attr.ib(default=None)
 
     # dropout / ensemble
@@ -195,15 +240,14 @@ class ModelConfiguration(HalfFrozenObject):
     temperature: float = attr.ib(default=None)
 
     def default_ignore(self) -> List[str]:
-        """define default attributes to ignore when loading/storing models
-        """
+        """define default attributes to ignore when loading/storing models"""
 
         ignore = [
-            'temperature',
-            'ensemble_max_init_no',
-            'ensemble_min_init_no',
-            'num_samples_dropout',
-            'init_no'
+            "temperature",
+            "ensemble_max_init_no",
+            "ensemble_min_init_no",
+            "num_samples_dropout",
+            "init_no",
         ]
 
         for i in ignore:
@@ -221,14 +265,21 @@ class TrainingConfiguration(HalfFrozenObject):
     epochs: int = attr.ib(default=None)
     warmup_epochs: int = attr.ib(default=None)
     finetune_epochs: int = attr.ib(default=None)
-    stopping_mode: str = attr.ib(default=None, validator=lambda i, a, v: v in (None, 'default', 'average', 'multiple'))
+    stopping_mode: str = attr.ib(
+        default=None,
+        validator=lambda i, a, v: v in (None, "default", "average", "multiple"),
+    )
     stopping_patience: int = attr.ib(default=None)
     stopping_restore_best: bool = attr.ib(default=None)
     stopping_metric: str = attr.ib(default=None)
     stopping_minimize: bool = attr.ib(default=None)
 
 
-def configs_from_dict(d: dict) -> Tuple[RunConfiguration, DataConfiguration, ModelConfiguration, TrainingConfiguration]:
+def configs_from_dict(
+    d: dict,
+) -> Tuple[
+    RunConfiguration, DataConfiguration, ModelConfiguration, TrainingConfiguration
+]:
     """utility function converting a dictionary (e.g. coming from a .yaml file) into the corresponding configuration objects
 
     Args:
@@ -237,9 +288,9 @@ def configs_from_dict(d: dict) -> Tuple[RunConfiguration, DataConfiguration, Mod
     Returns:
         Tuple[RunConfiguration, DataConfiguration, ModelConfiguration, TrainingConfiguration]: tuple of corresponding objects for run, data, model, and training configuration
     """
-    run = RunConfiguration(**d['run'])
-    data = DataConfiguration(**d['data'])
-    model = ModelConfiguration(**d['model'])
-    training = TrainingConfiguration(**d['training'])
+    run = RunConfiguration(**d["run"])
+    data = DataConfiguration(**d["data"])
+    model = ModelConfiguration(**d["model"])
+    training = TrainingConfiguration(**d["training"])
 
     return run, data, model, training

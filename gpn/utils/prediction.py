@@ -111,7 +111,6 @@ class Prediction(HalfFrozenObject):
             p_val = [getattr(p, var_name) for p in p_to_collate]
 
             if isinstance(var_val, SparseTensor):
-                print(var_name)
                 var_val = var_val.to_torch_sparse_coo_tensor()
 
             self.set_value(var_name, torch.cat([var_val, *p_val]))

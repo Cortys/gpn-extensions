@@ -27,6 +27,7 @@ class APPNPPropagation(MessagePassing):
         add_self_loops: bool = True,
         normalization: str | None = "sym",
         sparse_x_prune_threshold: float = 0.01,
+        stochastic_x=True,
         **kwargs,
     ):
         kwargs.setdefault("aggr", "add")
@@ -37,9 +38,17 @@ class APPNPPropagation(MessagePassing):
         self.cached = cached
         self.add_self_loops = add_self_loops
         assert normalization in (
-            "sym", "rw", "in-degree", "out-degree", "in-degree-sym", "sym-var", None)
+            "sym",
+            "rw",
+            "in-degree",
+            "out-degree",
+            "in-degree-sym",
+            "sym-var",
+            None,
+        )
         self.normalization = normalization
         self.sparse_x_prune_threshold = sparse_x_prune_threshold
+        self.stochastic_x = stochastic_x
 
         self._cached_edge_index = None
         self._cached_adj_t = None
@@ -111,10 +120,24 @@ class APPNPPropagation(MessagePassing):
                     raise TypeError(f"Invalid edge_index type {type(edge_index)}.")
 
             # propagate_type: (x: Tensor, edge_weight: OptTensor)
-            x = self.propagate(edge_index, x=x, edge_weight=edge_weight, size=None)
+            x: Tensor | SparseTensor = self.propagate(
+                edge_index, x=x, edge_weight=edge_weight, size=None
+            )
 
             if isinstance(x, SparseTensor):
                 x = x.set_value(x.storage.value() * (1 - self.alpha), "coo") + h  # type: ignore
+                t = self.sparse_x_prune_threshold
+
+                if t is not None:
+                    x_vals: Tensor | None = x.storage.value()
+                    if x_vals is not None:
+                        x_sum = 1 if self.stochastic_x else x.sum(-1)  # type: ignore
+                        x_mask = x_vals >= t
+                        x = x.masked_select_nnz(x_mask, layout="coo")  # type: ignore
+                        x_sum_masked = x.sum(-1)  # type: ignore
+                        x_sum_diff = x_sum - x_sum_masked
+                        x = x.set_diag(x.get_diag() + x_sum_diff)  # type: ignore
+
             else:
                 x = x * (1 - self.alpha)
                 x += h
