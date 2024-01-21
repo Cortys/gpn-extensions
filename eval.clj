@@ -128,11 +128,14 @@
     [(keyword k) v]))
 
 (defn start!
-  [{:keys [dataset model setting override dry]
+  [{:keys [dataset model setting override
+           dry retrain]
     :or {dataset default-datasets
          model default-models
          setting default-settings}}]
-  (let [override (into {} (map parse-override) override)]
+  (let [default-config (cond-> {}
+                         retrain (assoc :run.retrain true))
+        override (into default-config (map parse-override) override)]
     (print-grid dataset model setting override)
     (when-not dry
       (println "\nStarting experiments...\n")
@@ -166,6 +169,10 @@
            :multiple true}
           {:as "Dry Run"
            :option "dry"
+           :default false
+           :type :with-flag}
+          {:as "Retrain Models"
+           :option "retrain"
            :default false
            :type :with-flag}]
    :runs start!})

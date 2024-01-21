@@ -35,6 +35,8 @@ class RunConfiguration(HalfFrozenObject):
 
     # save-flag (e.g. for not saving GridSearch experiments)
     save_model: bool = attr.ib(default=None)
+    retrain: bool = attr.ib(default=None)
+    reeval: bool = attr.ib(default=None)
 
     # gpu
     gpu: int = attr.ib(default=None, validator=lambda i, a, v: v in (0, False))

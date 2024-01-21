@@ -130,23 +130,24 @@ class TransductiveExperiment:
             model.create_storage(self.run_cfg, self.data_cfg, self.model_cfg,
                                  self.train_cfg, ex=self.ex)
 
-            try:
-                # if it is possible to load model: skip training
-                model.load_from_storage()
-                self.run_cfg.set_values(job='evaluate')
-                model.set_expects_training(False)
-                self.run_cfg.set_values(save_model=False)
+            if not self.run_cfg.retrain:
+                try:
+                    # if it is possible to load model: skip training
+                    model.load_from_storage()
+                    self.run_cfg.set_values(job='evaluate')
+                    model.set_expects_training(False)
+                    self.run_cfg.set_values(save_model=False)
 
-                if self.run_cfg.eval_mode == 'dropout':
-                    assert self.run_cfg.job == 'evaluate'
-                    model = DropoutEnsemble(model, num_samples=self.model_cfg.num_samples_dropout)
+                    if self.run_cfg.eval_mode == 'dropout':
+                        assert self.run_cfg.job == 'evaluate'
+                        model = DropoutEnsemble(model, num_samples=self.model_cfg.num_samples_dropout)
 
-                elif self.run_cfg.eval_mode == 'energy_scoring':
-                    assert self.run_cfg.job == 'evaluate'
-                    model = EnergyScoring(model, temperature=self.model_cfg.temperature)
+                    elif self.run_cfg.eval_mode == 'energy_scoring':
+                        assert self.run_cfg.job == 'evaluate'
+                        model = EnergyScoring(model, temperature=self.model_cfg.temperature)
 
-            except ModelNotFoundError:
-                pass
+                except ModelNotFoundError:
+                    pass
 
         self.model = model
 
