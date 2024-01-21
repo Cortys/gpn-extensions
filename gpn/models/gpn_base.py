@@ -20,6 +20,7 @@ class GPN(Model):
     """Graph Posterior Network model"""
 
     default_normalization = "sym"
+    default_x_prune_threshold = None
 
     def __init__(self, params: ModelConfiguration):
         super().__init__(params)
@@ -88,7 +89,7 @@ class GPN(Model):
             add_self_loops=self.params.add_self_loops,
             cached=False,
             normalization=normalization,
-            sparse_x_prune_threshold=x_prune_threshold
+            sparse_x_prune_threshold=x_prune_threshold,
         )
 
     def forward(self, data: Data) -> Prediction:

@@ -26,7 +26,7 @@ class APPNPPropagation(MessagePassing):
         cached: bool = False,
         add_self_loops: bool = True,
         normalization: str | None = "sym",
-        sparse_x_prune_threshold: float = 0.01,
+        sparse_x_prune_threshold: float | None = None,
         stochastic_x=True,
         **kwargs,
     ):
@@ -120,7 +120,7 @@ class APPNPPropagation(MessagePassing):
                     raise TypeError(f"Invalid edge_index type {type(edge_index)}.")
 
             # propagate_type: (x: Tensor, edge_weight: OptTensor)
-            x: Tensor | SparseTensor = self.propagate(
+            x = self.propagate(
                 edge_index, x=x, edge_weight=edge_weight, size=None
             )
 
