@@ -51,12 +51,16 @@
                      (when-not (namespace k)
                        (str (name k) "=" v)))
                    overrides)]
+    (when depends-on
+      (log/info "Running dependency...")
+      (apply run-config! depends-on)
+      (log/info "Ran dependency. Continuing with parent..."))
     (log/info "Running with" config (str/join " " args))
     (try
       (apply shell "python3 train_and_eval.py"
              "with" config args)
       (catch ExceptionInfo _
-        (log/error "Run failed:" config (str/join " " args) ))))
+        (log/error "Run failed:" config (str/join " " args)))))
   )
 
 (defn build-config-path

@@ -136,7 +136,7 @@ class Model(nn.Module):
 
         storage = Storage(run_cfg.experiment_directory,
                           experiment_name=run_cfg.eval_experiment_name,
-                          experiment=ex)
+                          experiment=ex, allow_override=run_cfg.retrain)
 
         storage_params = {**model_cfg.to_dict(ignore=model_cfg.default_ignore()),
                           **data_cfg.to_dict(), **train_cfg.to_dict()}
@@ -163,7 +163,11 @@ class Model(nn.Module):
             raise ModelNotFoundError('Error on storing model, storage does not exist!')
 
         model_file_path = self.storage.create_model_file_path(
-            self.storage_params['model_name'], self.storage_params, init_no=self.params.init_no
+            self.storage_params['model_name'], self.storage_params,
+            init_no=self.params.init_no
         )
 
         self.save_to_file(model_file_path)
+
+    def save_results_to_storage():
+        pass

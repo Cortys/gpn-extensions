@@ -45,6 +45,7 @@ class Storage:
         experiment_name: str = "",
         experiment: Optional[Experiment] = None,
         lock_timeout: int = 10,
+        allow_override: bool = False,
     ):
         cache_dir = os.path.join(base_directory, experiment_name)
         os.makedirs(cache_dir, exist_ok=True)
@@ -52,6 +53,7 @@ class Storage:
         self.experiment = experiment
         self.cache_dir = cache_dir
         self.lock_timeout = lock_timeout
+        self.allow_override = allow_override
 
         self.dbs: Dict[str, TinyDB] = {}
 
@@ -105,7 +107,7 @@ class Storage:
     def _find_meta_by_exact_params(
         self, table: str, params: Dict[str, Any]
     ) -> List[Dict[str, Any]]:
-        return self._get_db(table).search(Query().params == params) # type: ignore
+        return self._get_db(table).search(Query().params == params)  # type: ignore
 
     def _find_meta(
         self, table: str, match_condition: Dict[str, Any]
@@ -122,9 +124,9 @@ class Storage:
             )
 
         if composite_condition is None:
-            return self._get_db(table).all() # type: ignore
+            return self._get_db(table).all()  # type: ignore
 
-        return self._get_db(table).search(composite_condition) # type: ignore
+        return self._get_db(table).search(composite_condition)  # type: ignore
 
     def build_model_dir_path(self, artifact_type: str, dir_id: Union[int, str]) -> str:
         path = os.path.join(self.cache_dir, artifact_type, str(dir_id))
@@ -138,6 +140,13 @@ class Storage:
         model_file_path = os.path.join(path, model_file_name)
 
         return model_file_path
+
+    def build_results_file_path(self, path: str, init_no: int = 1) -> str:
+        # final model path, file-name is simply based on init_no
+        results_file_name = f"results_{init_no}.json"
+        results_file_path = os.path.join(path, results_file_name)
+
+        return results_file_path
 
     def create_model_file_path(
         self, artifact_type: str, params: Dict[str, Any], init_no: int = 1
@@ -158,7 +167,7 @@ class Storage:
             path = self.build_model_dir_path(artifact_type, documents[0]["id"])
             model_file_path = self.build_model_file_path(path, init_no=init_no)
 
-            if os.path.exists(model_file_path):
+            if os.path.exists(model_file_path) and not self.allow_override:
                 raise ModelExistsError(
                     f"model already exists (artifact_type={artifact_type}, \
                     params={params}, init_no={init_no})"
@@ -184,6 +193,46 @@ class Storage:
         model_file_path = self.build_model_file_path(path, init_no=init_no)
 
         return model_file_path
+
+    def create_results_file_path(
+        self, artifact_type: str, params: Dict[str, Any], init_no: int = 1
+    ) -> str:
+        documents = self.find_artifacts(artifact_type, params)
+
+        # more than one matching document: search ambiguous, raise Error
+        if len(documents) > 1:
+            raise RuntimeError(
+                f"Found more than one matching entry (artficat_type={artifact_type}, params={params}"
+            )
+
+        # exactly 1 document found, i.e. some models with same configuration
+        # might exists: check if same init_no already exists, if so raise Error
+        # else return proper results_file_path
+        if len(documents) == 1:
+            # check if init_no already exists
+            path = self.build_model_dir_path(artifact_type, documents[0]["id"])
+            results_file_path = self.build_results_file_path(path, init_no=init_no)
+
+            return results_file_path
+
+        # else: default case, no previous models with same config exist
+        # return results_file_path
+        ids = Storage.locked_call(
+            lambda: self._upsert_meta(artifact_type, params),
+            self._get_lock_path(artifact_type),
+            self.lock_timeout,
+        )
+
+        if len(ids) != 1:
+            raise RuntimeError(
+                f"Something unexpected happened. The index contains duplicates \
+                (artifact_type={artifact_type}, params={params})"
+            )
+
+        path = self.build_model_dir_path(artifact_type, ids[0])
+        results_file_path = self.build_results_file_path(path, init_no=init_no)
+
+        return results_file_path
 
     def retrieve_model_dir_path(
         self, artifact_type: str, match_condition: Dict[str, Any]

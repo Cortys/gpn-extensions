@@ -1,4 +1,6 @@
 import os
+
+from gpn.utils.storage import ModelExistsError
 os.environ['MKL_THREADING_LAYER'] = 'GNU'
 
 from typing import Optional, Dict, Any
@@ -152,6 +154,8 @@ class TransductiveExperiment:
         self.model = model
 
     def evaluate(self) -> Dict[str, Any]:
+        eval_results_file = self.model.storage.create_results_file_path()
+        reeval = self.run_cfg.reeval
         metrics = unn.get_metrics(self.metrics)
         eval_res = self.engine.evaluate(data=self.dataset.val_loader, metrics=metrics, gpu=self.run_cfg.gpu)
         eval_val = eval_res['val']
