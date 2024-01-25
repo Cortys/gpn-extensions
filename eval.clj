@@ -23,6 +23,7 @@
 
 (def models
   {"appnp" {::name "appnp"}
+   "ggp" {::name "ggp"}
    "gdk" {::name "gdk"}
    "gpn" {::name "gpn_16"}
    "gpn_rw" {::name "gpn_16"
