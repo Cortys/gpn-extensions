@@ -1,3 +1,5 @@
+import json
+import os
 from typing import Any, Dict
 from pyblaze.nn.callbacks.tracking import TensorboardTracker
 import torch
@@ -55,7 +57,7 @@ class Model(nn.Module):
             sample_confidence_aleatoric=max_soft,
             sample_confidence_epistemic=None,
             sample_confidence_features=None,
-            sample_confidence_structure=None
+            sample_confidence_structure=None,
         )
         # ---------------------------------------------------------------------------------
 
@@ -88,34 +90,35 @@ class Model(nn.Module):
     def loss(self, prediction: Prediction, data: Data) -> Dict[str, torch.Tensor]:
         return self.CE_loss(prediction, data)
 
-    def warmup_loss(self, prediction: Prediction, data: Data) -> Dict[str, torch.Tensor]:
+    def warmup_loss(
+        self, prediction: Prediction, data: Data
+    ) -> Dict[str, torch.Tensor]:
         raise NotImplementedError
 
-    def fintetune_loss(self, prediction: Prediction, data: Data) -> Dict[str, torch.Tensor]:
+    def fintetune_loss(
+        self, prediction: Prediction, data: Data
+    ) -> Dict[str, torch.Tensor]:
         raise NotImplementedError
 
-    def CE_loss(self, prediction: Prediction, data: Data, reduction='mean') -> Dict[str, torch.Tensor]:
+    def CE_loss(
+        self, prediction: Prediction, data: Data, reduction="mean"
+    ) -> Dict[str, torch.Tensor]:
         y_hat: torch.Tensor = prediction.log_soft
-        y_hat, y = apply_mask(data, y_hat, split='train') # type: ignore
+        y_hat, y = apply_mask(data, y_hat, split="train")  # type: ignore
 
-        return {
-            'CE': F.nll_loss(y_hat, y, reduction=reduction)
-        }
+        return {"CE": F.nll_loss(y_hat, y, reduction=reduction)}
 
     def save_to_file(self, model_path: str) -> None:
-        save_dict = {
-            'model_state_dict': self.state_dict(),
-            'cached_y': self.cached_y
-        }
+        save_dict = {"model_state_dict": self.state_dict(), "cached_y": self.cached_y}
         torch.save(save_dict, model_path)
 
     def load_from_file(self, model_path: str) -> None:
         if not torch.cuda.is_available():
-            c = torch.load(model_path, map_location=torch.device('cpu'))
+            c = torch.load(model_path, map_location=torch.device("cpu"))
         else:
             c = torch.load(model_path)
-        self.load_state_dict(c['model_state_dict'])
-        self.cached_y = c['cached_y']
+        self.load_state_dict(c["model_state_dict"])
+        self.cached_y = c["cached_y"]
 
     def get_optimizer(self, lr: float, weight_decay: float) -> optim.Adam:
         optimizer = optim.Adam(self.parameters(), lr=lr, weight_decay=weight_decay)
@@ -127,47 +130,92 @@ class Model(nn.Module):
     def get_finetune_optimizer(self, lr: float, weight_decay: float) -> optim.Adam:
         raise NotImplementedError
 
-    def create_storage(self, run_cfg: RunConfiguration, data_cfg: DataConfiguration,
-                       model_cfg: ModelConfiguration, train_cfg: TrainingConfiguration,
-                       ex: Experiment | None = None):
-
-        if run_cfg.job == 'train' or (run_cfg.job == 'evaluate' and run_cfg.eval_experiment_name is None):
+    def create_storage(
+        self,
+        run_cfg: RunConfiguration,
+        data_cfg: DataConfiguration,
+        model_cfg: ModelConfiguration,
+        train_cfg: TrainingConfiguration,
+        ex: Experiment | None = None,
+    ):
+        if run_cfg.job == "train" or (
+            run_cfg.job == "evaluate" and run_cfg.eval_experiment_name is None
+        ):
             run_cfg.set_values(eval_experiment_name=run_cfg.experiment_name)
 
-        storage = Storage(run_cfg.experiment_directory,
-                          experiment_name=run_cfg.eval_experiment_name,
-                          experiment=ex, allow_override=run_cfg.retrain)
+        storage = Storage(
+            run_cfg.experiment_directory,
+            experiment_name=run_cfg.eval_experiment_name,
+            experiment=ex,
+            allow_override=run_cfg.retrain,
+        )
 
-        storage_params = {**model_cfg.to_dict(ignore=model_cfg.default_ignore()),
-                          **data_cfg.to_dict(), **train_cfg.to_dict()}
+        storage_params = {
+            **model_cfg.to_dict(ignore=model_cfg.default_ignore()),
+            **data_cfg.to_dict(),
+            **train_cfg.to_dict(),
+        }
 
         # ignore ood parameters for matching in an evasion setting
-        if run_cfg.job == 'evaluate' and data_cfg.ood_flag and data_cfg.ood_setting == 'evasion':
-            storage_params = {k: v for k, v in storage_params.items() if not k.startswith('ood_')}
+        if (
+            run_cfg.job == "evaluate"
+            and data_cfg.ood_flag
+            and data_cfg.ood_setting == "evasion"
+        ):
+            storage_params = {
+                k: v for k, v in storage_params.items() if not k.startswith("ood_")
+            }
 
         self.storage = storage
         self.storage_params = storage_params
 
     def load_from_storage(self) -> None:
         if self.storage is None or self.storage_params is None:
-            raise ModelNotFoundError('Error on loading model, storage does not exist!')
+            raise ModelNotFoundError("Error on loading model, storage does not exist!")
 
         model_file_path = self.storage.retrieve_model_file_path(
-            self.storage_params['model_name'], self.storage_params, init_no=self.params.init_no
+            self.storage_params["model_name"],
+            self.storage_params,
+            init_no=self.params.init_no,
         )
 
         self.load_from_file(model_file_path)
 
     def save_to_storage(self) -> None:
         if self.storage is None or self.storage_params is None:
-            raise ModelNotFoundError('Error on storing model, storage does not exist!')
+            raise ModelNotFoundError("Error on storing model, storage does not exist!")
 
         model_file_path = self.storage.create_model_file_path(
-            self.storage_params['model_name'], self.storage_params,
-            init_no=self.params.init_no
+            self.storage_params["model_name"],
+            self.storage_params,
+            init_no=self.params.init_no,
         )
 
         self.save_to_file(model_file_path)
 
-    def save_results_to_storage():
-        pass
+    def create_results_file_path(self):
+        if self.storage is None or self.storage_params is None:
+            raise ModelNotFoundError(
+                "Error on storing model results, storage does not exist!"
+            )
+
+        return self.storage.create_results_file_path(
+            self.storage_params["model_name"],
+            self.storage_params,
+            init_no=self.params.init_no,
+        )
+
+    def write_results(self, results):
+        results_file_path = self.create_results_file_path()
+
+        with open(results_file_path, "w") as f:
+            json.dump(results, f)
+
+    def read_results(self):
+        results_file_path = self.create_results_file_path()
+
+        if not os.path.isfile(results_file_path):
+            return None
+
+        with open(results_file_path, "r") as f:
+            return json.load(f)
