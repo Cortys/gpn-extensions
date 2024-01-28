@@ -1,6 +1,8 @@
+import json
 import os
+from gpn.utils import storage
 
-from gpn.utils.storage import ModelExistsError
+from gpn.utils.storage import ModelExistsError, create_storage
 
 os.environ["MKL_THREADING_LAYER"] = "GNU"
 
@@ -31,11 +33,16 @@ class TransductiveExperiment:
         model_cfg: ModelConfiguration,
         train_cfg: TrainingConfiguration,
         ex: Optional[Experiment] = None,
+        dataset: Optional[ExperimentDataset] = None,
     ):
         self.run_cfg = run_cfg
         self.model_cfg = model_cfg
         self.data_cfg = data_cfg
         self.train_cfg = train_cfg
+        self.evaluation_results = None
+        self.training_completed = False
+        self.storage = None
+        self.storage_params = None
 
         self.model = None
         self.ex = ex
@@ -100,17 +107,53 @@ class TransductiveExperiment:
 
         # base dataset
         set_seed(self.model_cfg.seed)
-        self.dataset = ExperimentDataset(data_cfg, to_sparse=data_cfg.to_sparse)
-        self.model_cfg.set_values(
-            dim_features=self.dataset.dim_features, num_classes=self.dataset.num_classes
+
+        self.setup_storage()
+
+        if dataset is None:
+            if self.evaluation_results is None:
+                self.dataset = ExperimentDataset(
+                    self.data_cfg, to_sparse=self.data_cfg.to_sparse
+                )
+            else:
+                self.dataset = None
+        else:
+            self.dataset = dataset
+
+        if self.dataset is not None:
+            self.model_cfg.set_values(
+                dim_features=self.dataset.dim_features, num_classes=self.dataset.num_classes
+            )
+            self.setup_model()
+            self.setup_engine()
+
+    def setup_storage(self):
+        storage, storage_params = create_storage(
+            self.run_cfg, self.data_cfg, self.model_cfg, self.train_cfg, ex=self.ex
         )
-        self.setup_model()
-        self.setup_engine()
+        self.storage = storage
+        self.storage_params = storage_params
+
+        if not self.run_cfg.reeval:
+            results_file_path = storage.create_results_file_path(
+                self.model_cfg.model_name,
+                storage_params,
+                init_no=self.model_cfg.init_no,
+            )
+            if os.path.exists(results_file_path):
+                with open(results_file_path, "r") as f:
+                    self.evaluation_results = json.load(f)
+
 
     def setup_engine(self) -> None:
-        self.engine = TransductiveGraphEngine(self.model, splits=self.dataset.splits)
+        self.engine = TransductiveGraphEngine(
+            self.model, splits=self.dataset.splits
+        )
 
     def setup_model(self) -> None:
+        assert self.storage is not None
+        assert self.storage_params is not None
+
         if self.run_cfg.eval_mode == "ensemble":
             self.run_cfg.set_values(save_model=False)
 
@@ -120,13 +163,7 @@ class TransductiveExperiment:
 
             if self.run_cfg.job == "evaluate":
                 model = Ensemble(self.model_cfg, models=None)
-                model.create_storage(
-                    self.run_cfg,
-                    self.data_cfg,
-                    self.model_cfg,
-                    self.train_cfg,
-                    ex=self.ex,
-                )
+                model.set_storage(self.storage, self.storage_params)
                 model.load_from_storage()
 
             else:
@@ -134,9 +171,7 @@ class TransductiveExperiment:
 
         else:
             model = create_model(self.model_cfg)
-            model.create_storage(
-                self.run_cfg, self.data_cfg, self.model_cfg, self.train_cfg, ex=self.ex
-            )
+            model.set_storage(self.storage, self.storage_params)
 
             if not self.run_cfg.retrain:
                 try:
@@ -164,11 +199,9 @@ class TransductiveExperiment:
         self.model = model
 
     def evaluate(self) -> Dict[str, Any]:
+        if self.evaluation_results is not None:
+            return self.evaluation_results
         assert self.model is not None
-        if not self.run_cfg.reeval:
-            results = self.model.read_results()
-            if results is not None:
-                return results
 
         metrics = unn.get_metrics(self.metrics)
         eval_res = self.engine.evaluate(
@@ -188,11 +221,9 @@ class TransductiveExperiment:
         return results
 
     def evaluate_ood(self) -> Dict[str, Any]:
+        if self.evaluation_results is not None:
+            return self.evaluation_results
         assert self.model is not None
-        if not self.run_cfg.reeval:
-            results = self.model.read_results()
-            if results is not None:
-                return results
 
         metrics = unn.get_metrics(self.metrics)
         ood_metrics = unn.get_metrics(self.ood_metrics)
@@ -227,8 +258,7 @@ class TransductiveExperiment:
         return results
 
     def train(self) -> History | None:
-        assert self.model is not None
-        if not self.model.expects_training():
+        if self.model is None or not self.model.expects_training():
             return None
 
         callbacks = []
@@ -341,6 +371,7 @@ class TransductiveExperiment:
         self.dataset.train_val_dataset.to("cpu")
         self.dataset.warmup_dataset.to("cpu")
         self.dataset.finetune_dataset.to("cpu")
+        self.training_completed = True
 
         return history
 
@@ -356,8 +387,11 @@ class TransductiveExperiment:
         # save trained model
         # or potential values to be cached
         # e.g. alpha_prior of y_soft
-        if self.run_cfg.save_model:
-            assert self.model is not None
+        if (
+            self.model is not None
+            and self.run_cfg.save_model
+            and self.training_completed
+        ):
             self.model.save_to_storage()
 
         return results

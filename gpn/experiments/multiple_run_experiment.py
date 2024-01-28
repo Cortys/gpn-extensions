@@ -11,28 +11,40 @@ class MultipleRunExperiment:
     """wrapper for experiment which runs a experiment over for all init_no and split_no and aggregates the results"""
 
     def __init__(
-            self,
-            run_cfg: RunConfiguration,
-            data_cfg: DataConfiguration,
-            model_cfg: ModelConfiguration,
-            training_cfg: TrainingConfiguration,
-            ex: Experiment | None = None):
-
+        self,
+        run_cfg: RunConfiguration,
+        data_cfg: DataConfiguration,
+        model_cfg: ModelConfiguration,
+        training_cfg: TrainingConfiguration,
+        ex: Experiment | None = None,
+    ):
         self.run_cfg = run_cfg
         self.data_cfg = data_cfg
         self.model_cfg = model_cfg
         self.train_cfg = training_cfg
         self.ex = ex
+        self._cached_dataset = None
 
-        if self.run_cfg.eval_mode == 'ensemble' or self.model_cfg.model_name in ('GDK', 'DiffusionRho', 'MaternGGP', 'GGP'):
+        if self.run_cfg.eval_mode == "ensemble" or self.model_cfg.model_name in (
+            "GDK",
+            "DiffusionRho",
+            "MaternGGP",
+            "GGP",
+        ):
             self.init_nos = [1]
 
         else:
-            self.init_nos = [self.model_cfg.init_no] if self.run_cfg.num_inits is None else \
-                range(1, self.run_cfg.num_inits + 1)
+            self.init_nos = (
+                [self.model_cfg.init_no]
+                if self.run_cfg.num_inits is None
+                else range(1, self.run_cfg.num_inits + 1)
+            )
 
-        self.split_nos = [self.data_cfg.split_no] if self.run_cfg.num_splits is None else \
-            range(1, self.run_cfg.num_splits + 1)
+        self.split_nos = (
+            [self.data_cfg.split_no]
+            if self.run_cfg.num_splits is None
+            else range(1, self.run_cfg.num_splits + 1)
+        )
 
         # disable logging when evaluating multiple inits and splits
         if len(self.split_nos) + len(self.init_nos) > 2:
@@ -42,11 +54,12 @@ class MultipleRunExperiment:
         run_results = []
 
         for split_no in self.split_nos:
+            self._cached_dataset = None
             for init_no in self.init_nos:
                 self.data_cfg.set_values(split_no=split_no)
                 self.model_cfg.set_values(init_no=init_no)
 
-                if self.run_cfg.ex_type == 'transductive':
+                if self.run_cfg.ex_type == "transductive":
                     results = self.run_transductive_experiment()
 
                 else:
@@ -65,16 +78,22 @@ class MultipleRunExperiment:
 
         else:
             return_results = {
-                **{f'{k}': v for k, v in result_means.items()},
-                **{f'{k}_val': v for k, v in result_values.items()}
+                **{f"{k}": v for k, v in result_means.items()},
+                **{f"{k}_val": v for k, v in result_values.items()},
             }
 
         return return_results
 
     def run_transductive_experiment(self) -> Dict[str, Any]:
         experiment = TransductiveExperiment(
-            self.run_cfg.clone(), self.data_cfg.clone(),
-            self.model_cfg.clone(), self.train_cfg.clone(), ex=self.ex)
+            self.run_cfg.clone(),
+            self.data_cfg.clone(),
+            self.model_cfg.clone(),
+            self.train_cfg.clone(),
+            ex=self.ex,
+            dataset=self._cached_dataset
+        )
+        self._cached_dataset = experiment.dataset
         results = experiment.run()
 
         return results

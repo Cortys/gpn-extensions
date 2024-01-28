@@ -7,6 +7,8 @@ from sacred import Experiment
 from tinydb import Query, TinyDB
 from tinydb_serialization import SerializationMiddleware, Serializer
 
+from gpn.utils.config import DataConfiguration, ModelConfiguration, RunConfiguration, TrainingConfiguration
+
 
 class ModelExistsError(Exception):
     """exception raised when existing model found with the same configuration at a certain path"""
@@ -291,3 +293,43 @@ class Storage:
             documents.append(document)
 
         return documents
+
+
+def create_storage(
+    run_cfg: RunConfiguration,
+    data_cfg: DataConfiguration,
+    model_cfg: ModelConfiguration,
+    train_cfg: TrainingConfiguration,
+    ex: Optional[Experiment] = None,
+):
+    if run_cfg.job == "train" or (
+        run_cfg.job == "evaluate" and run_cfg.eval_experiment_name is None
+    ):
+        run_cfg.set_values(eval_experiment_name=run_cfg.experiment_name)
+
+    storage = Storage(
+        run_cfg.experiment_directory,
+        experiment_name=run_cfg.eval_experiment_name,
+        experiment=ex,
+        allow_override=run_cfg.retrain,
+    )
+
+    storage_params = {
+        **model_cfg.to_dict(ignore=model_cfg.default_ignore()),
+        **data_cfg.to_dict(),
+        **train_cfg.to_dict(),
+    }
+
+    # ignore ood parameters for matching in an evasion setting
+    if (
+        run_cfg.job == "evaluate"
+        and data_cfg.ood_flag
+        and data_cfg.ood_setting == "evasion"
+    ):
+        storage_params = {
+            k: v for k, v in storage_params.items() if not k.startswith("ood_")
+        }
+
+    return storage, storage_params
+
+

@@ -9,11 +9,11 @@ import torch.nn.functional as F
 from torch_geometric.data import Data
 from sacred import Experiment
 from gpn.layers import CertaintyDiffusion
-from gpn.utils import apply_mask
+from gpn.utils import apply_mask, storage
 from gpn.utils import Prediction
 from gpn.utils import RunConfiguration, DataConfiguration
 from gpn.utils import ModelConfiguration, TrainingConfiguration
-from gpn.utils import Storage, ModelNotFoundError
+from gpn.utils import Storage, create_storage, ModelNotFoundError
 
 
 class Model(nn.Module):
@@ -138,34 +138,13 @@ class Model(nn.Module):
         train_cfg: TrainingConfiguration,
         ex: Experiment | None = None,
     ):
-        if run_cfg.job == "train" or (
-            run_cfg.job == "evaluate" and run_cfg.eval_experiment_name is None
-        ):
-            run_cfg.set_values(eval_experiment_name=run_cfg.experiment_name)
-
-        storage = Storage(
-            run_cfg.experiment_directory,
-            experiment_name=run_cfg.eval_experiment_name,
-            experiment=ex,
-            allow_override=run_cfg.retrain,
+        storage, storage_params = create_storage(
+            run_cfg, data_cfg, model_cfg, train_cfg, ex
         )
 
-        storage_params = {
-            **model_cfg.to_dict(ignore=model_cfg.default_ignore()),
-            **data_cfg.to_dict(),
-            **train_cfg.to_dict(),
-        }
+        self.set_storage(storage, storage_params)
 
-        # ignore ood parameters for matching in an evasion setting
-        if (
-            run_cfg.job == "evaluate"
-            and data_cfg.ood_flag
-            and data_cfg.ood_setting == "evasion"
-        ):
-            storage_params = {
-                k: v for k, v in storage_params.items() if not k.startswith("ood_")
-            }
-
+    def set_storage(self, storage: Storage, storage_params: dict[str, Any]):
         self.storage = storage
         self.storage_params = storage_params
 
@@ -210,12 +189,3 @@ class Model(nn.Module):
 
         with open(results_file_path, "w") as f:
             json.dump(results, f)
-
-    def read_results(self):
-        results_file_path = self.create_results_file_path()
-
-        if not os.path.isfile(results_file_path):
-            return None
-
-        with open(results_file_path, "r") as f:
-            return json.load(f)
