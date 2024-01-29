@@ -74,7 +74,9 @@ class GGP(GPFLOWGGP):
         t = trange(self.epochs)
         for step in t:
             elbo = -training_step(
-                idx_train, node_labels[idx_train], optimizer, gprocess
+                tf.reshape(idx_train, (-1, 1)),
+                tf.reshape(node_labels[idx_train], (-1, 1)),
+                optimizer, gprocess
             )
 
             if step % 200 == 0:

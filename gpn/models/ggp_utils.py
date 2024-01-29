@@ -1,5 +1,6 @@
 
 
+from re import X
 from typing import Tuple
 
 import gpflow
@@ -35,7 +36,7 @@ def get_submatrix(adj_matrix, node_idcs):
 
 class GraphSVGP(SVGP):
     """GraphSVGP
-    
+
     code taken from https://github.com/FelixOpolka/GGP-TF2/blob/master/GraphSVGP.py
     """
 

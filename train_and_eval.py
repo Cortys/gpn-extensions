@@ -1,3 +1,4 @@
+import json
 import os
 from typing import OrderedDict
 import warnings
@@ -76,4 +77,7 @@ def run_experiment(run: dict, data: dict, model: dict, training: dict) -> dict:
     print(df.to_markdown())
     print()
 
-    return results
+    if run_cfg.results_path is not None:
+        df.to_json(path_or_buf=run_cfg.results_path, orient="columns", indent=4)
+    else:
+        return results

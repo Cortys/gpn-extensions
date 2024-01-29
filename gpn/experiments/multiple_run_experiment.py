@@ -1,7 +1,9 @@
+import gc
 from typing import Dict, Any
 import copy
 import numpy as np
 from sacred import Experiment
+import torch
 from gpn.utils import RunConfiguration, DataConfiguration
 from gpn.utils import ModelConfiguration, TrainingConfiguration
 from .transductive_experiment import TransductiveExperiment
@@ -46,10 +48,6 @@ class MultipleRunExperiment:
             else range(1, self.run_cfg.num_splits + 1)
         )
 
-        # disable logging when evaluating multiple inits and splits
-        if len(self.split_nos) + len(self.init_nos) > 2:
-            self.run_cfg.set_values(log=False)
-
     def run(self):
         run_results = []
 
@@ -91,9 +89,14 @@ class MultipleRunExperiment:
             self.model_cfg.clone(),
             self.train_cfg.clone(),
             ex=self.ex,
-            dataset=self._cached_dataset
+            dataset=self._cached_dataset,
         )
         self._cached_dataset = experiment.dataset
         results = experiment.run()
+
+        experiment = None
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
 
         return results

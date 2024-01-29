@@ -1,8 +1,7 @@
 import json
 import os
-from gpn.utils import storage
 
-from gpn.utils.storage import ModelExistsError, create_storage
+from gpn.utils.storage import create_storage
 
 os.environ["MKL_THREADING_LAYER"] = "GNU"
 
@@ -70,6 +69,11 @@ class TransductiveExperiment:
             "average_entropy",
         ]
 
+        if self.run_cfg.reduced_training_metrics:
+            self.train_metrics = ["accuracy", "ce"]
+        else:
+            self.train_metrics = self.metrics
+
         self.ood_metrics = [
             # metrics for ood detection (id vs ood)
             "ood_detection_aleatoric_apr",
@@ -122,7 +126,8 @@ class TransductiveExperiment:
 
         if self.dataset is not None:
             self.model_cfg.set_values(
-                dim_features=self.dataset.dim_features, num_classes=self.dataset.num_classes
+                dim_features=self.dataset.dim_features,
+                num_classes=self.dataset.num_classes,
             )
             self.setup_model()
             self.setup_engine()
@@ -144,11 +149,9 @@ class TransductiveExperiment:
                 with open(results_file_path, "r") as f:
                     self.evaluation_results = json.load(f)
 
-
     def setup_engine(self) -> None:
-        self.engine = TransductiveGraphEngine(
-            self.model, splits=self.dataset.splits
-        )
+        assert self.dataset is not None
+        self.engine = TransductiveGraphEngine(self.model, splits=self.dataset.splits)
 
     def setup_model(self) -> None:
         assert self.storage is not None
@@ -202,6 +205,7 @@ class TransductiveExperiment:
         if self.evaluation_results is not None:
             return self.evaluation_results
         assert self.model is not None
+        assert self.dataset is not None
 
         metrics = unn.get_metrics(self.metrics)
         eval_res = self.engine.evaluate(
@@ -224,6 +228,7 @@ class TransductiveExperiment:
         if self.evaluation_results is not None:
             return self.evaluation_results
         assert self.model is not None
+        assert self.dataset is not None
 
         metrics = unn.get_metrics(self.metrics)
         ood_metrics = unn.get_metrics(self.ood_metrics)
@@ -258,7 +263,11 @@ class TransductiveExperiment:
         return results
 
     def train(self) -> History | None:
-        if self.model is None or not self.model.expects_training():
+        if (
+            self.model is None
+            or self.dataset is None
+            or not self.model.expects_training()
+        ):
             return None
 
         callbacks = []
@@ -269,7 +278,7 @@ class TransductiveExperiment:
             callbacks.append(batch_progress_logger)
             warmup_callbacks.append(batch_progress_logger)
 
-        metrics = unn.get_metrics(self.metrics)
+        metrics = unn.get_metrics(self.train_metrics)
 
         callbacks.extend(get_callbacks_from_config(self.train_cfg))
 
@@ -281,6 +290,11 @@ class TransductiveExperiment:
         self.dataset.train_val_dataset.to(device)
         self.dataset.warmup_dataset.to(device)
         self.dataset.finetune_dataset.to(device)
+
+        eval_every = self.train_cfg.eval_every
+
+        if eval_every is None:
+            eval_every = 1
 
         # ------------------------------------------------------------------------------------------------
         # warmup training
@@ -301,7 +315,7 @@ class TransductiveExperiment:
                 likelihood_optimizer=None,
                 loss=self.model.warmup_loss,
                 epochs=self.train_cfg.warmup_epochs,
-                eval_every=1,
+                eval_every=eval_every,
                 eval_train=True,
                 callbacks=warmup_callbacks,
                 metrics=metrics,
@@ -330,7 +344,7 @@ class TransductiveExperiment:
             likelihood_optimizer=likelihood_optimizer,
             loss=self.model.loss,
             epochs=self.train_cfg.epochs,
-            eval_every=1,
+            eval_every=eval_every,
             eval_train=True,
             callbacks=callbacks,
             metrics=metrics,
@@ -359,7 +373,7 @@ class TransductiveExperiment:
                 likelihood_optimizer=None,
                 loss=self.model.finetune_loss,
                 epochs=self.train_cfg.finetune_epochs,
-                eval_every=1,
+                eval_every=eval_every,
                 eval_train=True,
                 callbacks=warmup_callbacks,
                 metrics=metrics,
@@ -376,6 +390,13 @@ class TransductiveExperiment:
         return history
 
     def run(self) -> Dict[str, Any]:
+        exp_params = ", ".join([
+            f"model={self.model_cfg.model_name}",
+            f"dataset={self.data_cfg.dataset}",
+            f"ood_type={self.data_cfg.ood_type}",
+            f"split={self.data_cfg.split_no}",
+            f"init={self.model_cfg.init_no}"])
+        print(f"Starting experiment ({exp_params}).")
         if self.run_cfg.job == "train":
             self.train()
 
@@ -393,5 +414,7 @@ class TransductiveExperiment:
             and self.training_completed
         ):
             self.model.save_to_storage()
+
+        print(f"Completed experiment ({exp_params}).")
 
         return results

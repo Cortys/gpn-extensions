@@ -16,6 +16,10 @@ class RunConfiguration(HalfFrozenObject):
     # root directory to save/load models to/from
     experiment_directory: str = attr.ib(default=None)
 
+    results_path: str = attr.ib(default=None)
+
+    reduced_training_metrics: str = attr.ib(default=False)
+
     # evaluation mode
     #   default: e.g. ood evasion or re-evaluation
     #   dropout: i.e. DropoutEnsemble evaluation
@@ -275,6 +279,7 @@ class TrainingConfiguration(HalfFrozenObject):
     stopping_restore_best: bool = attr.ib(default=None)
     stopping_metric: str = attr.ib(default=None)
     stopping_minimize: bool = attr.ib(default=None)
+    eval_every: int = attr.ib(default=None)
 
 
 def configs_from_dict(
