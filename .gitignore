@@ -5,6 +5,8 @@
 
 saved_experiments/**
 !saved_experiments/README.md
+results
+!results/.gitkeep
 
 data/**
 !data/README.md
