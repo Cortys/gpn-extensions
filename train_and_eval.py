@@ -33,7 +33,7 @@ def config():
 
 
 @ex.automain
-def run_experiment(run: dict, data: dict, model: dict, training: dict) -> dict:
+def run_experiment(run: dict, data: dict, model: dict, training: dict) -> dict | None:
     """main function to run experiment with sacred support
 
     Args:

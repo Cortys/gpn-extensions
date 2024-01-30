@@ -13,8 +13,7 @@
                  :run.num_inits 10
                  :run.num_splits 10})
 (def big-default-ds (merge default-ds
-                           {:run.log "True"
-                            :model.sparse_propagation "True"}))
+                           {:model.sparse_propagation "True"}))
 (def datasets
   {"CoraML" default-ds
    "CiteSeerFull" default-ds
@@ -26,7 +25,8 @@
                         :run.num_splits 1
                         :run.reduced_training_metrics "True"
                         :training.eval_every 10
-                        :training.stopping_patience 5})})
+                        :training.stopping_patience 5
+                        :run.log "True"})})
 
 (def models
   {"appnp" {::name "appnp"}
@@ -50,17 +50,20 @@
                        :data.ood_perturbation_type "bernoulli_0.5"}})
 
 (def combination-overrides
-  {{::model "gpn_lop" ::dataset "ogbn-arxiv"}
-   {:model.sparse_x_prune_threshold 0.03}})
+  {{::model "gpn_lop" ::dataset "PubMedFull"}
+   {:run.log "True"}
+   {::model "gpn_lop" ::dataset "ogbn-arxiv"}
+   {:model.sparse_x_prune_threshold 0.01}})
 
 (def default-datasets ["CoraML"
                        "CiteSeerFull"
                        "AmazonPhotos"
                        "AmazonComputers"
-                       "PubMedFull"])
+                       "PubMedFull"
+                       #_"ogbn-arxiv"])
 (def default-models ["appnp"
                      #_"ggp"
-                     "gdk"
+                     #_"gdk"
                      "gpn"
                      "gpn_rw"
                      "gpn_lop"])

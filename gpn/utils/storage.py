@@ -203,8 +203,9 @@ class Storage:
 
         # more than one matching document: search ambiguous, raise Error
         if len(documents) > 1:
+            document_ids = [d["id"] for d in documents]
             raise RuntimeError(
-                f"Found more than one matching entry (artficat_type={artifact_type}, params={params}"
+                f"Found more than one matching entry (artficat_type={artifact_type}, params={params}): {document_ids}"
             )
 
         # exactly 1 document found, i.e. some models with same configuration
@@ -331,5 +332,3 @@ def create_storage(
         }
 
     return storage, storage_params
-
-

@@ -54,7 +54,7 @@ class RunConfiguration(HalfFrozenObject):
     debug: bool = attr.ib(default=True)  # flag for running code in a "DEBUG" mode
     ex_type: str = attr.ib(
         default="transductive",
-        validator=lambda i, a, v: v in ("transductive", "transductive_ood"),
+        validator=lambda i, a, v: v in ("transductive", "transductive_ood"), # type: ignore
     )  # type: ignore
 
     ood_loc: bool = attr.ib(default=True)  # flag for running LOC in ood_experiment
@@ -254,6 +254,8 @@ class ModelConfiguration(HalfFrozenObject):
             "ensemble_min_init_no",
             "num_samples_dropout",
             "init_no",
+            "dim_features",
+            "num_classes"
         ]
 
         for i in ignore:
