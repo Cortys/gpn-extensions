@@ -366,6 +366,12 @@ class TransductiveGraphEngine(Engine):
     ################################################################################
     ### UTILITY FUNCTIONS
     ################################################################################
+    def _process_metric(self, metric):
+        metric = super()._process_metric(metric)
+        if isinstance(metric, torch.Tensor):
+            return metric.tolist()
+        return metric
+
     def _aggregate_metrics(self, evals, metrics):
         metric_results = {}
         for s in self.splits:

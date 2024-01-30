@@ -63,12 +63,19 @@
                        #_"ogbn-arxiv"])
 (def default-models ["appnp"
                      #_"ggp"
-                     #_"gdk"
+                     "gdk" ; no training, enable after adding acc-rej
                      "gpn"
                      "gpn_rw"
                      "gpn_lop"])
 (def default-settings ["classification"
                        "ood_loc"])
+
+(def dataset-colnames
+  {"ogbn-arxiv" "Arxiv"})
+
+(def model-colnames
+  {"gpn_rw" "gpnRW"
+   "gpn_lop" "gpnLOP"})
 
 (defn run-config!
   [config & {:keys [::depends-on] :as overrides}]
@@ -138,7 +145,7 @@
                                               setting-name
                                               overrides)))
 
-(defn cached-run-combination!
+(defn get-combination-results
   [dataset-name model-name setting-name overrides
    & {:keys [only-cached] :or {only-cached false}}]
   (let [combination-id (stringify-combination dataset-name
@@ -146,9 +153,7 @@
                                               setting-name)
         results-path (str "results/" combination-id ".json")]
     (if (and (not (:run.reeval overrides)) (fs/exists? results-path))
-      (do
-        (log/info "Loading" combination-id "from cache...")
-        (json/parse-stream (io/reader results-path)))
+      (log/debug "Loading" combination-id "from cache...")
       (if only-cached
         (throw (Exception. (str "No cached results for" combination-id)))
         (do
@@ -157,14 +162,79 @@
           (run-combination! dataset-name
                             model-name
                             setting-name
-                            (assoc overrides :run.results_path results-path)))))))
+                            (assoc overrides :run.results_path results-path)))))
+    (json/parse-stream (io/reader results-path) true)))
 
 (defn run-combinations!
   [dataset-names model-names setting-names overrides & {:as opts}]
   (doseq [dataset-name dataset-names
           model-name model-names
           setting-name setting-names]
-    (cached-run-combination! dataset-name model-name setting-name overrides opts)))
+    (get-combination-results dataset-name model-name setting-name overrides opts)))
+
+(defn get-acc-rej-curve
+  [dataset-name model-name confidence-type uncertainty-type]
+  (let [key (str "accuracy_rejection_" confidence-type "_confidence_"
+                 uncertainty-type)
+        mean-kw (keyword key)
+        var-kw (keyword (str key "_var"))
+        results (get-combination-results dataset-name model-name
+                                         "classification" {}
+                                         :only-cached true)
+        results (:test results)
+        mean (mean-kw results)]
+    (when mean
+      {:mean mean
+       :var (var-kw results)})))
+
+(defn get-acc-rej-curve-with-fallback
+  [dataset-name model-name types]
+  (first (eduction (keep #(apply get-acc-rej-curve dataset-name model-name %))
+                   types)))
+
+(defn run-acc-rej-table-gen!
+  [dataset type]
+  (let [types (case type
+                "sample"
+                [["sample" "epistemic"]
+                 ["sample" "aleatoric"]]
+                "prediction"
+                [["prediction" "epistemic"]
+                 ["prediction" "aleatoric"]]
+                "sample_aleatoric"
+                [["sample" "aleatoric"]]
+                "sample_epistemic"
+                [["sample" "epistemic"]]
+                "prediction_aleatoric"
+                [["prediction" "aleatoric"]]
+                "prediction_epistemic"
+                [["prediction" "epistemic"]])
+        curves
+        (into {}
+              (comp (map #(do [% (get-acc-rej-curve-with-fallback dataset %
+                                                                  types)]))
+                    (filter (comp :mean second)))
+              default-models)
+        models (keys curves)
+        N (-> curves first second :mean count)
+        head (str/join "," (into ["p"]
+                                 (comp
+                                  (map #(get model-colnames % %))
+                                  (mapcat #(do [(str % "Mean")
+                                                (str % "Var")])))
+                                 models))
+        body (for [i (range N)
+                   :let [p (double (/ i (dec N)))]]
+               (str/join ","
+                         (into [p]
+                               (mapcat (fn [model]
+                                         (let [{:keys [mean var]}
+                                               (curves model)]
+                                           [(get mean i)
+                                            (get var i)]))
+                                       models))))
+        csv (str/join "\n" (cons head body))]
+    (spit (str "tables/acc_rej_" type "_" (dataset-colnames dataset dataset) ".csv") csv)))
 
 (defn print-grid
   [dataset-names model-names setting-names overrides]
@@ -202,15 +272,20 @@
         override (into default-config (map parse-override) override)]
     (print-grid dataset model setting override)
     (when-not dry
-      (println "\nStarting experiments...\n")
+      (log/info "Starting experiments...")
       (Thread/sleep 500)
       (run-combinations! dataset model setting override
                          :only-cached only-cached))
-    (println "\nDone.")))
+    (log/info "Done.")))
 
-(defn run-table-gen!
+(defn run-acc-rej-tables-gen!
   []
-  )
+  (log/info "Generating accuracy-rejection tables...")
+  (doseq [dataset default-datasets
+          type ["sample" "sample_aleatoric" "sample_epistemic"
+                "prediction" "prediction_aleatoric" "prediction_epistemic"]]
+    (run-acc-rej-table-gen! dataset type))
+  (log/info "Done."))
 
 (def CLI-CONFIGURATION
   {:command "cuq-gnn"
@@ -255,9 +330,9 @@
                           :default false
                           :type :with-flag}]
                   :runs run-eval!}
-                 {:command "table"
+                 {:command "acc-rej-tables"
                   :description "Generate a results CSV."
-                  :runs run-table-gen!}]})
+                  :runs run-acc-rej-tables-gen!}]})
 
 (defn -main
   [& args]
@@ -267,4 +342,6 @@
   (run-config! "configs/gpn/classification_gpn_16.yaml"
                :data.dataset "CoraML")
   (cli/run-cmd* [] CLI-CONFIGURATION)
+
+  (run-acc-rej-tables-gen!)
   )

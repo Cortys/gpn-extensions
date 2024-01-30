@@ -67,7 +67,7 @@ class MultipleRunExperiment:
 
         result_keys = run_results[0].keys()
         result_values = {k: [v[k] for v in run_results] for k in result_keys}
-        result_means = {k: float(np.array(v).mean()) for k, v in result_values.items()}
+        result_means = {k: np.array(v).mean(0) for k, v in result_values.items()}
 
         return_results = None
         # if only one configuration: behave as default experiment

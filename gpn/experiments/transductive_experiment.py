@@ -67,12 +67,18 @@ class TransductiveExperiment:
             "avg_sample_confidence_features",
             "avg_sample_confidence_neighborhood",
             "average_entropy",
+            "accuracy_rejection_prediction_confidence_aleatoric",
+            "accuracy_rejection_prediction_confidence_epistemic",
+            "accuracy_rejection_sample_confidence_aleatoric",
+            "accuracy_rejection_sample_confidence_epistemic",
+            "accuracy_rejection_sample_confidence_epistemic_entropy",
         ]
 
         if self.run_cfg.reduced_training_metrics:
             self.train_metrics = ["accuracy", "ce"]
         else:
-            self.train_metrics = self.metrics
+            # Leave out accuracy rejections curves for training
+            self.train_metrics = self.metrics[:-5]
 
         self.ood_metrics = [
             # metrics for ood detection (id vs ood)
@@ -390,12 +396,15 @@ class TransductiveExperiment:
         return history
 
     def run(self) -> Dict[str, Any]:
-        exp_params = ", ".join([
-            f"model={self.model_cfg.model_name}",
-            f"dataset={self.data_cfg.dataset}",
-            f"ood_type={self.data_cfg.ood_type}",
-            f"split={self.data_cfg.split_no}",
-            f"init={self.model_cfg.init_no}"])
+        exp_params = ", ".join(
+            [
+                f"model={self.model_cfg.model_name}",
+                f"dataset={self.data_cfg.dataset}",
+                f"ood_type={self.data_cfg.ood_type}",
+                f"split={self.data_cfg.split_no}",
+                f"init={self.model_cfg.init_no}",
+            ]
+        )
         print(f"Starting experiment ({exp_params}).")
         if self.run_cfg.job == "train":
             self.train()

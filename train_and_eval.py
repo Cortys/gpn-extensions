@@ -73,9 +73,9 @@ def run_experiment(run: dict, data: dict, model: dict, training: dict) -> dict |
     results = experiment.run()
     df = results_dict_to_df(results)
 
-    print()
-    print(df.to_markdown())
-    print()
+    # print()
+    # print(df.to_markdown())
+    # print()
 
     if run_cfg.results_path is not None:
         df.to_json(path_or_buf=run_cfg.results_path, orient="columns", indent=4)

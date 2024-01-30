@@ -9,6 +9,7 @@ from .metrics import ood_detection_features
 from .metrics import ood_detection_structure
 from .metrics import ood_detection_neighborhood
 from .metrics import average_confidence, average_entropy
+from .metrics import accuracy_rejection_curve
 from .loss import cross_entropy
 
 
@@ -213,6 +214,51 @@ def get_metric(metric: str):
     if metric == "average_entropy":
         return "average_entropy", lambda y_hat, y: _metric_wrapper(
             average_entropy, y_hat, y, key=None
+        )
+
+    if metric == "accuracy_rejection_prediction_confidence_aleatoric":
+        return metric, lambda y_hat, y: _metric_wrapper(
+            accuracy_rejection_curve,
+            y_hat,
+            y,
+            confidence_type="prediction",
+            uncertainty_type="aleatoric",
+        )
+
+    if metric == "accuracy_rejection_prediction_confidence_epistemic":
+        return metric, lambda y_hat, y: _metric_wrapper(
+            accuracy_rejection_curve,
+            y_hat,
+            y,
+            confidence_type="prediction",
+            uncertainty_type="epistemic",
+        )
+
+    if metric == "accuracy_rejection_sample_confidence_aleatoric":
+        return metric, lambda y_hat, y: _metric_wrapper(
+            accuracy_rejection_curve,
+            y_hat,
+            y,
+            confidence_type="sample",
+            uncertainty_type="aleatoric",
+        )
+
+    if metric == "accuracy_rejection_sample_confidence_epistemic":
+        return metric, lambda y_hat, y: _metric_wrapper(
+            accuracy_rejection_curve,
+            y_hat,
+            y,
+            confidence_type="sample",
+            uncertainty_type="epistemic",
+        )
+
+    if metric == "accuracy_rejection_sample_confidence_epistemic_entropy":
+        return metric, lambda y_hat, y: _metric_wrapper(
+            accuracy_rejection_curve,
+            y_hat,
+            y,
+            confidence_type="sample",
+            uncertainty_type="epistemic_entropy",
         )
 
     # metrics for ood detection

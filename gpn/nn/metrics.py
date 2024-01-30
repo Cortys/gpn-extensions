@@ -348,3 +348,42 @@ def bin_predictions(
             conf_binned[b] = y_hat_t[in_bin].mean()
 
     return acc_binned, conf_binned, bin_cardinalities
+
+
+def accuracy_rejection_curve(
+    y_hat: Prediction,
+    y: Tensor,
+    n_bins: int = 101,
+    confidence_type: str = "sample",
+    uncertainty_type: str = "aleatoric",
+):
+    key = f"{confidence_type}_confidence_{uncertainty_type}"
+    return _accuracy_rejection_curve(y_hat, y, key, n_bins)
+
+def _accuracy_rejection_curve(
+    y_hat: Prediction, y: Tensor, key: str, n_bins: int = 100
+):
+    uncertainty_estimates: Tensor = getattr(y_hat, key)
+
+    if uncertainty_estimates is None:
+        return torch.as_tensor(float("nan"))
+
+    y_hat_label_t = y_hat.hard
+    sort_idx = uncertainty_estimates.argsort()
+    corrects = y_hat_label_t == y.squeeze()
+    corrects = corrects[sort_idx]
+    N = len(corrects)
+    if n_bins is None:
+        bin_idxs = torch.arange(N)
+        n_bins = N
+    else:
+        bin_idxs = (torch.linspace(0, 1, n_bins) * N).int()
+        bin_idxs[-1] = N-1
+    accs = torch.zeros(n_bins, dtype=torch.float32)
+
+    for i in range(n_bins):
+        idx = bin_idxs[i]
+        acc = corrects[idx:].float().mean()
+        accs[i] = acc
+
+    return accs

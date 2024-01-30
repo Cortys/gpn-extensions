@@ -8,3 +8,6 @@ trim_trailing_whitespace = true
 
 [*.clj]
 indent_size = 1
+
+[TARGET_DIR]
+insert_final_newline = false
