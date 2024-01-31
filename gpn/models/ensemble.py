@@ -2,6 +2,7 @@ from typing import List
 import torch
 import torch.nn as nn
 from torch_geometric.data import Data
+from gpn.nn.loss import categorical_entropy_reg
 from gpn.utils import Prediction, ModelConfiguration
 from .model import Model
 from .utils import create_model
@@ -29,6 +30,7 @@ class Ensemble(Model):
 
         soft = softs.mean(1)
         max_soft, hard = soft.max(-1)
+        neg_entropy = categorical_entropy_reg(soft, 1, reduction="none")
 
         # empirical variance p_c^{(i)} of predicted class
         var = torch.var(softs, dim=-2)
@@ -46,14 +48,13 @@ class Ensemble(Model):
             var=var,
             var_predicted=var_predicted,
             softs=softs,
-
             # prediction confidence
             prediction_confidence_aleatoric=max_soft,
             prediction_confidence_epistemic=1.0 / (var_predicted + self.var_eps),
             prediction_confidence_structure=None,
-
             # sample confidence
             sample_confidence_aleatoric=max_soft,
+            sample_confidence_aleatoric_entropy=neg_entropy,
             sample_confidence_epistemic=1.0 / (var + self.var_eps),
             sample_confidence_features=None,
             sample_confidence_structure=None,
@@ -67,9 +68,11 @@ class Ensemble(Model):
 
     def load_from_storage(self) -> None:
         if self.storage is None or self.storage_params is None:
-            raise RuntimeError('Error on loading model, storage does not exist!')
+            raise RuntimeError("Error on loading model, storage does not exist!")
 
-        path = self.storage.retrieve_model_dir_path(self.params.model_name, self.storage_params)
+        path = self.storage.retrieve_model_dir_path(
+            self.params.model_name, self.storage_params
+        )
         models = []
 
         # ensemble assumes that random initializations 1 - 10 are in path

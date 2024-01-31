@@ -5,6 +5,7 @@ import torch_geometric.nn as tnn
 from torch_geometric.data import Data
 from torch_geometric.utils import dropout_adj
 from gpn.layers import LinearSequentialLayer
+from gpn.nn.loss import categorical_entropy_reg
 from gpn.utils import Prediction, ModelConfiguration
 from .model import Model
 
@@ -46,6 +47,7 @@ class APPNP(Model):
         log_soft = F.log_softmax(x, dim=-1)
         soft = torch.exp(log_soft)
         max_soft, hard = soft.max(dim=-1)
+        neg_entropy = categorical_entropy_reg(soft, 1, reduction="none")
 
         # ---------------------------------------------------------------------------------
         pred = Prediction(
@@ -61,7 +63,9 @@ class APPNP(Model):
             prediction_confidence_structure=None,
             # confidence of sample
             sample_confidence_aleatoric=max_soft,
+            sample_confidence_aleatoric_entropy=neg_entropy,
             sample_confidence_epistemic=None,
+            sample_confidence_epistemic_entropy=None,
             sample_confidence_features=None,
             sample_confidence_structure=None,
         )

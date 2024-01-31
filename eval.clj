@@ -279,7 +279,7 @@
     (log/info "Done.")))
 
 (defn run-acc-rej-tables-gen!
-  []
+  [& _]
   (log/info "Generating accuracy-rejection tables...")
   (doseq [dataset default-datasets
           type ["sample" "sample_aleatoric" "sample_epistemic"

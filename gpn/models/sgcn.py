@@ -9,6 +9,7 @@ from torch_geometric.data import Data
 from sacred import Experiment
 import gpn.nn as unn
 from gpn.layers import GCNConv
+from gpn.nn.loss import categorical_entropy_reg
 from gpn.utils import Prediction, apply_mask
 from gpn.utils import RunConfiguration, ModelConfiguration, DataConfiguration
 from gpn.utils import TrainingConfiguration
@@ -75,7 +76,7 @@ class SGCN(Model):
                 x = self.conv2(x, edge_index)
                 samples[i] = x
 
-            log_evidence = torch.stack(samples, dim=1) # type: ignore
+            log_evidence = torch.stack(samples, dim=1)  # type: ignore
 
             if self.params.sample_method == "log_evidence":
                 log_evidence = log_evidence.mean(dim=1)
@@ -96,6 +97,7 @@ class SGCN(Model):
         alpha = 1.0 + evidence
         soft = alpha / alpha.sum(-1, keepdim=True)
         max_soft, hard = soft.max(-1)
+        neg_entropy = categorical_entropy_reg(soft, 1, reduction="none")
 
         # ---------------------------------------------------------------------------------
         pred = Prediction(
@@ -109,6 +111,7 @@ class SGCN(Model):
             prediction_confidence_structure=None,
             # sample confidence scores
             sample_confidence_aleatoric=max_soft,
+            sample_confidence_aleatoric_entropy=neg_entropy,
             sample_confidence_epistemic=alpha.sum(-1),
             sample_confidence_features=None,
             sample_confidence_structure=None,
@@ -130,8 +133,8 @@ class SGCN(Model):
         # n_nodes = data.y.size(0)
         # n_train = data.train_mask.sum()
         # bayesian risk of sum of squares
-        alpha_train, y = apply_mask(data, alpha, split="train") # type: ignore
-        bay_risk = unn.bayesian_risk_sosq(alpha_train, y, reduction="sum") # type: ignore
+        alpha_train, y = apply_mask(data, alpha, split="train")  # type: ignore
+        bay_risk = unn.bayesian_risk_sosq(alpha_train, y, reduction="sum")  # type: ignore
         losses = {"BR": bay_risk * 1.0 / (n_nodes * frac_train)}
 
         # KL divergence w.r.t. alpha-prior from Gaussian Dirichlet Kernel
@@ -157,7 +160,7 @@ class SGCN(Model):
                     self.epoch += 1
 
             y_teacher = self.y_teacher.to(prediction.soft.device)
-            lambda_2 = min(1.0, self.epoch * 1.0 / 200) # type: ignore
+            lambda_2 = min(1.0, self.epoch * 1.0 / 200)  # type: ignore
             categorical_pred = D.Categorical(prediction.soft)
             categorical_teacher = D.Categorical(y_teacher)
             KL_teacher = D.kl.kl_divergence(categorical_pred, categorical_teacher)

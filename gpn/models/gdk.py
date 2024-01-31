@@ -2,12 +2,15 @@ import math
 import torch
 from torch import Tensor
 import networkx as nx
-from networkx.algorithms.shortest_paths.unweighted import single_source_shortest_path_length
+from networkx.algorithms.shortest_paths.unweighted import (
+    single_source_shortest_path_length,
+)
 import torch_geometric.transforms as T
 from torch_geometric.utils import to_networkx
 from torch_geometric.data import Data
 
 from gpn.utils import Prediction, ModelConfiguration
+from gpn.nn.loss import categorical_entropy_reg, entropy_reg
 from .model import Model
 
 
@@ -34,21 +37,26 @@ class GDK(Model):
         soft = alpha / alpha.sum(-1, keepdim=True)
         max_soft, hard = soft.max(-1)
 
+        fo_neg_entropy = categorical_entropy_reg(soft, 1, reduction="none")
+        so_neg_entropy = entropy_reg(alpha, 1, approximate=True, reduction="none")
+
         # ---------------------------------------------------------------------------------
         pred = Prediction(
             # prediction and intermediary scores
             soft=soft,
             hard=hard,
             alpha=alpha,
-
             # prediction confidence scores
             prediction_confidence_aleatoric=max_soft,
             prediction_confidence_epistemic=alpha[torch.arange(hard.size(0)), hard],
-            prediction_confidence_structure=distance_evidence[[torch.arange(hard.size(0)), hard]],
-
+            prediction_confidence_structure=distance_evidence[
+                [torch.arange(hard.size(0)), hard]
+            ],
             # sample confidence scores
             sample_confidence_aleatoric=max_soft,
+            sample_confidence_aleatoric_entropy=fo_neg_entropy,
             sample_confidence_epistemic=alpha.sum(-1),
+            sample_confidence_epistemic_entropy=so_neg_entropy,
             sample_confidence_features=None,
             sample_confidence_structure=distance_evidence.sum(-1),
         )
@@ -65,7 +73,7 @@ class GDK(Model):
 
     def load_from_file(self, model_path: str) -> None:
         if not torch.cuda.is_available():
-            alpha = torch.load(model_path, map_location=torch.device('cpu'))
+            alpha = torch.load(model_path, map_location=torch.device("cpu"))
         else:
             alpha = torch.load(model_path)
         self.cached_alpha = alpha
@@ -73,7 +81,7 @@ class GDK(Model):
 
 def kernel_distance(x: Tensor, sigma: float = 1.0) -> Tensor:
     sigma_scale = 1.0 / (sigma * math.sqrt(2 * math.pi))
-    k_dis = torch.exp(-torch.square(x)/ (2 * sigma * sigma))
+    k_dis = torch.exp(-torch.square(x) / (2 * sigma * sigma))
     return sigma_scale * k_dis
 
 
@@ -89,7 +97,8 @@ def compute_kde(data: Data, num_classes: int, sigma: float = 1.0) -> Tensor:
     for idx_t in idx_train:
         distances = single_source_shortest_path_length(G, source=idx_t, cutoff=10)
         distances = torch.Tensor(
-            [distances[n] if n in distances else 1e10 for n in range(n_nodes)]).to(data.y.device)
+            [distances[n] if n in distances else 1e10 for n in range(n_nodes)]
+        ).to(data.y.device)
         evidence[:, data.y[idx_t]] += kernel_distance(distances, sigma=sigma)
 
     return evidence

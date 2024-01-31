@@ -5,6 +5,7 @@ import torch.optim as optim
 import gpflow
 import tensorflow as tf
 from torch_geometric.data import Data
+from gpn.nn.loss import categorical_entropy_reg
 from gpn.utils import ModelNotFoundError, Prediction, ModelConfiguration
 from .model import Model
 
@@ -31,6 +32,8 @@ class GPFLOWGGP(Model):
 
         max_soft, hard = soft.max(dim=-1)
         var_eps = 1.0e-8
+        neg_entropy = categorical_entropy_reg(soft, 1, reduction="none")
+
         # ---------------------------------------------------------------------------------
         pred = Prediction(
             # prediction and intermediary scores
@@ -38,14 +41,15 @@ class GPFLOWGGP(Model):
             hard=hard,
             # prediction confidence scores
             prediction_confidence_aleatoric=max_soft,
-            prediction_confidence_epistemic=1.0 / (var_per_class[torch.arange(hard.size(0)), hard] + var_eps),
+            prediction_confidence_epistemic=1.0
+            / (var_per_class[torch.arange(hard.size(0)), hard] + var_eps),
             prediction_confidence_structure=None,
-
             # sample confidence scores
             sample_confidence_aleatoric=max_soft,
+            sample_confidence_aleatoric_entropy=neg_entropy,
             sample_confidence_epistemic=1.0 / (var_per_class.sum(-1) + var_eps),
             sample_confidence_features=None,
-            sample_confidence_structure=None
+            sample_confidence_structure=None,
         )
         # ---------------------------------------------------------------------------------
 
@@ -78,9 +82,10 @@ class GPFLOWGGP(Model):
         frozen_model = gpflow.utilities.freeze(self.model)
         module_to_save = tf.Module()
         predict_fn = tf.function(
-            frozen_model.predict_y, input_signature=[tf.TensorSpec(shape=[None, 1], dtype=tf.float64)]
+            frozen_model.predict_y,
+            input_signature=[tf.TensorSpec(shape=[None, 1], dtype=tf.float64)],
         )
-        module_to_save.predict_y = predict_fn # type: ignore
+        module_to_save.predict_y = predict_fn  # type: ignore
         tf.saved_model.save(module_to_save, model_path)
 
     def load_from_file(self, model_path: str) -> None:
@@ -92,10 +97,14 @@ class GPFLOWGGP(Model):
     def loss(self, prediction: Prediction, data: Data) -> Dict[str, torch.Tensor]:
         raise NotImplementedError
 
-    def warmup_loss(self, prediction: Prediction, data: Data) -> Dict[str, torch.Tensor]:
+    def warmup_loss(
+        self, prediction: Prediction, data: Data
+    ) -> Dict[str, torch.Tensor]:
         raise NotImplementedError
 
-    def fintetune_loss(self, prediction: Prediction, data: Data) -> Dict[str, torch.Tensor]:
+    def fintetune_loss(
+        self, prediction: Prediction, data: Data
+    ) -> Dict[str, torch.Tensor]:
         raise NotImplementedError
 
     def CE_loss(self, prediction: Prediction, data: Data) -> Dict[str, torch.Tensor]:
@@ -121,4 +130,5 @@ class GPFLOWGGP(Model):
 
     def set_finetuning(self, flag: bool) -> None:
         raise NotImplementedError
+
     # -----------------------------------------------------------

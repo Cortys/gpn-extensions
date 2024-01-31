@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 from torch_geometric.data import Data
+from gpn.nn.loss import categorical_entropy_reg
 from gpn.utils import Prediction
 from .model import Model
 
@@ -9,7 +10,7 @@ class DropoutEnsemble(Model):
     """DropoutEnsemble
 
 
-    Wrapper-class for a DropoutEnsemble created from one model where 
+    Wrapper-class for a DropoutEnsemble created from one model where
     during inference the dropout ensemble is created from multiple forward passes
     """
 
@@ -27,13 +28,16 @@ class DropoutEnsemble(Model):
         was_training = self.model.training
         self._set_dropout_train(self.num_samples > 1)
 
-        softs = torch.stack([self.model(data).soft for s in range(self.num_samples)], dim=1)
+        softs = torch.stack(
+            [self.model(data).soft for s in range(self.num_samples)], dim=1
+        )
 
         if not was_training:
             self._set_dropout_train(False)
 
         soft = softs.mean(1)
         max_soft, hard = soft.max(-1)
+        neg_entropy = categorical_entropy_reg(soft, 1, reduction="none")
 
         # empirical variance p_c^{(i)} of predicted class
         var = torch.var(softs, dim=-2)
@@ -51,14 +55,13 @@ class DropoutEnsemble(Model):
             var=var,
             var_predicted=var_predicted,
             softs=softs,
-
             # prediction confidence
             prediction_confidence_aleatoric=max_soft,
             prediction_confidence_epistemic=1.0 / (var_predicted + self.var_eps),
             prediction_confidence_structure=None,
-
             # sample confidence
             sample_confidence_aleatoric=max_soft,
+            sample_confidence_aleatoric_entropy=neg_entropy,
             sample_confidence_epistemic=1.0 / (var + self.var_eps),
             sample_confidence_features=None,
             sample_confidence_structure=None,

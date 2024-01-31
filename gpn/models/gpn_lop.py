@@ -62,14 +62,15 @@ class GPN_LOP(GPN):
         soft_ft = alpha_features / alpha_features.sum(-1, keepdim=True)
         soft = propagation_weights @ soft_ft
         log_soft = soft.log()
+        fo_neg_entropy = categorical_entropy_reg(soft, 1, reduction="none")
 
         max_soft, hard = soft.max(dim=-1)
 
         neg_entropy_features = entropy_reg(
             alpha_features, 1, approximate=True, reduction="none"
         )
-        neg_entropy = (propagation_weights @ neg_entropy_features.view(-1, 1)).view(-1)
-        neg_entropy = neg_entropy + categorical_entropy_reg(
+        so_neg_entropy = (propagation_weights @ neg_entropy_features.view(-1, 1)).view(-1)
+        so_neg_entropy = so_neg_entropy + categorical_entropy_reg(
             propagation_weights, 1, reduction="none"
         )
 
@@ -96,8 +97,9 @@ class GPN_LOP(GPN):
             prediction_confidence_structure=None,
             # sample confidence scores
             sample_confidence_aleatoric=max_soft,
+            sample_confidence_aleatoric_entropy=fo_neg_entropy,
             sample_confidence_epistemic=alpha.sum(-1),
-            sample_confidence_epistemic_entropy=neg_entropy,
+            sample_confidence_epistemic_entropy=so_neg_entropy,
             sample_confidence_features=alpha_features.sum(-1),
             sample_confidence_structure=None,
         )

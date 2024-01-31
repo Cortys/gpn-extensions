@@ -1,4 +1,3 @@
-
 from typing import Dict, Tuple
 from sacred import Experiment
 import torch
@@ -7,7 +6,7 @@ import torch.optim as optim
 import torch.nn.functional as F
 import torch_geometric.utils as tu
 from torch_geometric.data import Data
-from gpn.nn import uce_loss, entropy_reg
+from gpn.nn import uce_loss, entropy_reg, categorical_entropy_reg
 from gpn.layers import APPNPPropagation
 from gpn.utils import RunConfiguration, DataConfiguration
 from gpn.utils import ModelConfiguration, TrainingConfiguration
@@ -36,8 +35,10 @@ class PostNet(Model):
         log_q_ft_per_class = self.gpn_mlp.flow(z) + p_c.view(1, -1).log()
 
         beta_ft = self.gpn_mlp.evidence(
-            log_q_ft_per_class, dim=self.gpn_mlp.params.dim_latent,
-            further_scale=self.gpn_mlp.params.num_classes).exp()
+            log_q_ft_per_class,
+            dim=self.gpn_mlp.params.dim_latent,
+            further_scale=self.gpn_mlp.params.num_classes,
+        ).exp()
 
         # alpha is uniform prior together with evidence votes
         alpha_features = 1.0 + beta_ft
@@ -48,6 +49,11 @@ class PostNet(Model):
 
         max_soft, hard = soft.max(dim=-1)
 
+        fo_neg_entropy = categorical_entropy_reg(soft, 1, reduction="none")
+        so_neg_entropy = entropy_reg(
+            alpha_features, 1, approximate=True, reduction="none"
+        )
+
         # ---------------------------------------------------------------------------------
         pred = Prediction(
             # predictions and intermediary scores
@@ -55,42 +61,46 @@ class PostNet(Model):
             soft=soft,
             log_soft=log_soft,
             hard=hard,
-
             logits=logits,
             latent=z,
             latent_features=z,
-
             hidden=h,
             hidden_features=h,
-
             evidence=beta_ft.sum(-1),
             evidence_ft=beta_ft.sum(-1),
             log_ft_per_class=log_q_ft_per_class,
-
             # prediction confidence scores
             prediction_confidence_aleatoric=max_soft,
-            prediction_confidence_epistemic=alpha_features[torch.arange(hard.size(0)), hard],
+            prediction_confidence_epistemic=alpha_features[
+                torch.arange(hard.size(0)), hard
+            ],
             prediction_confidence_structure=None,
-
             # sample confidence scores
             sample_confidence_aleatoric=max_soft,
+            sample_confidence_aleatoric_entropy=fo_neg_entropy
             sample_confidence_epistemic=alpha_features.sum(-1),
+            sample_confidence_epistemic_entropy=so_neg_entropy,
             sample_confidence_features=alpha_features.sum(-1),
-            sample_confidence_structure=None
+            sample_confidence_structure=None,
         )
         # ---------------------------------------------------------------------------------
 
         return pred
 
-    def create_storage(self, run_cfg: RunConfiguration, data_cfg: DataConfiguration,
-                       model_cfg: ModelConfiguration, train_cfg: TrainingConfiguration,
-                       ex: Experiment | None = None):
+    def create_storage(
+        self,
+        run_cfg: RunConfiguration,
+        data_cfg: DataConfiguration,
+        model_cfg: ModelConfiguration,
+        train_cfg: TrainingConfiguration,
+        ex: Experiment | None = None,
+    ):
         # create storage for model itself
         postnet_model_cfg = model_cfg.clone()
-        postnet_model_cfg.set_values(
-            model_name='GPN_MLP'
+        postnet_model_cfg.set_values(model_name="GPN_MLP")
+        self.gpn_mlp.create_storage(
+            run_cfg, data_cfg, postnet_model_cfg, train_cfg, ex=ex
         )
-        self.gpn_mlp.create_storage(run_cfg, data_cfg, postnet_model_cfg, train_cfg, ex=ex)
 
     def load_from_storage(self):
         self.gpn_mlp.load_from_storage()
@@ -116,13 +126,19 @@ class PostNet(Model):
     def save_to_storage(self) -> None:
         raise NotImplementedError
 
-    def get_optimizer(self, lr: float, weight_decay: float) -> Tuple[optim.Adam, optim.Adam]:
+    def get_optimizer(
+        self, lr: float, weight_decay: float
+    ) -> Tuple[optim.Adam, optim.Adam]:
         raise NotImplementedError
 
-    def warmup_loss(self, prediction: Prediction, data: Data) -> Dict[str, torch.Tensor]:
+    def warmup_loss(
+        self, prediction: Prediction, data: Data
+    ) -> Dict[str, torch.Tensor]:
         raise NotImplementedError
 
-    def finetune_loss(self, prediction: Prediction, data: Data) -> Dict[str, torch.Tensor]:
+    def finetune_loss(
+        self, prediction: Prediction, data: Data
+    ) -> Dict[str, torch.Tensor]:
         raise NotImplementedError
 
     def get_warmup_optimizer(self, lr: float, weight_decay: float) -> optim.Adam:

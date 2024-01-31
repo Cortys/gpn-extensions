@@ -6,6 +6,7 @@ import torch.nn.functional as F
 from torch_geometric.data import Data
 from gpn.layers import GaussianTransformation
 from gpn.layers import GaussianPropagation
+from gpn.nn.loss import categorical_entropy_reg
 from gpn.utils import Prediction, ModelConfiguration
 
 from .model import Model
@@ -24,11 +25,13 @@ class RGCN(Model):
         self.var_eps = 1.0e-8
 
         self.gaussian_1 = GaussianTransformation(
-            params.dim_features, params.dim_hidden, params.dropout_prob, activation=True)
+            params.dim_features, params.dim_hidden, params.dropout_prob, activation=True
+        )
 
         # no dropout, no non-linearity: only linear transformation
         self.gaussian_2 = GaussianTransformation(
-            params.dim_hidden, params.num_classes, params.dropout_prob, activation=False)
+            params.dim_hidden, params.num_classes, params.dropout_prob, activation=False
+        )
 
         # propagation
         self.propagation = GaussianPropagation(gamma=gamma)
@@ -56,6 +59,7 @@ class RGCN(Model):
         log_soft = F.log_softmax(z, dim=-1)
         soft = torch.exp(log_soft)
         max_soft, hard = soft.max(dim=-1)
+        neg_entropy = categorical_entropy_reg(soft, 1, reduction="none")
 
         # ---------------------------------------------------------------------------------
         pred = Prediction(
@@ -64,25 +68,23 @@ class RGCN(Model):
             log_soft=log_soft,
             hard=hard,
             logits=z,
-
             # rgcn
             mu_1=mu_1,
             mu_1p=mu_1p,
             mu_2=mu_2,
             mu_2p=mu_2p,
-
             var_1=var_1,
             var_1p=var_1p,
             var_2=var_2,
             var_2p=var_2p,
-
             # confidence of prediction
             prediction_confidence_aleatoric=max_soft,
-            prediction_confidence_epistemic=1.0 / (var_2p[torch.arange(hard.size(0)), hard] + self.var_eps),
+            prediction_confidence_epistemic=1.0
+            / (var_2p[torch.arange(hard.size(0)), hard] + self.var_eps),
             prediction_confidence_structure=None,
-
             # confidence of sample
             sample_confidence_aleatoric=max_soft,
+            sample_confidence_aleatoric_entropy=neg_entropy,
             # trace of covariance matrix
             sample_confidence_epistemic=1.0 / (var_2p.sum(-1) + self.var_eps),
             # trace of covariance matrix (only from features)
@@ -106,20 +108,26 @@ class RGCN(Model):
         # KL = 0.5 * sum_i var_i + mu_i^2 - 1 - ln(var_i)
         mu = prediction.mu_1
         var = prediction.var_1
-        kl = 0.5 * (var + mu ** 2 - 1 - (var + 1.0e-8).log()).mean(dim=-1).sum()
-        return {'KL': self.beta_kl * kl}
+        kl = 0.5 * (var + mu**2 - 1 - (var + 1.0e-8).log()).mean(dim=-1).sum()
+        return {"KL": self.beta_kl * kl}
 
     def L2(self) -> Dict[str, Tensor]:
-        norm2 = torch.norm(self.gaussian_1.mu.linear.linear.weight, 2).pow(2) + \
-            torch.norm(self.gaussian_1.var.linear.linear.weight, 2).pow(2)
+        norm2 = torch.norm(self.gaussian_1.mu.linear.linear.weight, 2).pow(
+            2
+        ) + torch.norm(self.gaussian_1.var.linear.linear.weight, 2).pow(2)
 
-        return {'L2': self.beta_reg * norm2}
+        return {"L2": self.beta_reg * norm2}
 
-    def get_optimizer(self, lr: float, weight_decay: float) -> Tuple[optim.Adam, optim.Adam | None]:
+    def get_optimizer(
+        self, lr: float, weight_decay: float
+    ) -> Tuple[optim.Adam, optim.Adam | None]:
         optimizer = optim.Adam(
-            [{'params': self.gaussian_1.parameters(), 'weight_decay': 0.0},
-             {'params': self.gaussian_2.parameters(), 'weight_decay': 0.0}],
-            lr=lr)
+            [
+                {"params": self.gaussian_1.parameters(), "weight_decay": 0.0},
+                {"params": self.gaussian_2.parameters(), "weight_decay": 0.0},
+            ],
+            lr=lr,
+        )
 
         warmup_optimizer = None
 

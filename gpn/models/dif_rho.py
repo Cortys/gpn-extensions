@@ -1,3 +1,4 @@
+from gpn.nn.loss import categorical_entropy_reg, entropy_reg
 from gpn.utils.config import ModelConfiguration
 import torch
 from torch_geometric.data import Data
@@ -17,8 +18,9 @@ class DiffusionRho(Model):
             alpha=0.1,
             add_self_loops=True,
             cached=False,
-            normalization='sym',
-            w=0.9)
+            normalization="sym",
+            w=0.9,
+        )
 
     def forward(self, data: Data) -> Prediction:
         return self.forward_impl(data)
@@ -30,6 +32,9 @@ class DiffusionRho(Model):
         soft = alpha / alpha.sum(-1, keepdim=True)
         max_soft, hard = soft.max(dim=-1)
 
+        fo_neg_entropy = categorical_entropy_reg(soft, 1, reduction="none")
+        so_neg_entropy = entropy_reg(alpha, 1, approximate=True, reduction="none")
+
         # ---------------------------------------------------------------------------------
         pred = Prediction(
             # prediction and intermediary scores
@@ -39,21 +44,19 @@ class DiffusionRho(Model):
             p_uc=p_uc,
             p_u=p_u,
             p_c=p_c,
-
             # prediction confidence scores
             prediction_confidence_aleatoric=max_soft,
             prediction_confidence_epistemic=alpha[torch.arange(hard.size(0)), hard],
             prediction_confidence_structure=p_uc[torch.arange(hard.size(0)), hard],
-
             # sample confidence scores
             sample_confidence_aleatoric=max_soft,
+            sample_confidence_aleatoric_entropy=fo_neg_entropy
             sample_confidence_epistemic=alpha.sum(-1),
+            sample_confidence_epistemic_entropy=so_neg_entropy,
             sample_confidence_features=None,
-            sample_confidence_structure=p_u
+            sample_confidence_structure=p_u,
         )
         # ---------------------------------------------------------------------------------
-
-
 
         return pred
 

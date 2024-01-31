@@ -5,6 +5,7 @@ import torch.nn.functional as F
 import torch_geometric.utils as tu
 from gpn.nn import uce_loss, entropy_reg
 from gpn.layers import APPNPPropagation
+from gpn.nn.loss import categorical_entropy_reg
 from gpn.utils import apply_mask
 from gpn.utils import Prediction
 from gpn.layers import Density, Evidence, ConnectedComponents
@@ -48,6 +49,11 @@ class GPN_LOG_BETA(GPN):
 
         max_soft, hard = soft.max(dim=-1)
 
+        fo_neg_entropy = categorical_entropy_reg(soft, 1, reduction="none")
+        so_neg_entropy = entropy_reg(
+            alpha_features, 1, approximate=True, reduction="none"
+        )
+
         # ---------------------------------------------------------------------------------
         pred = Prediction(
             # predictions and intermediary scores
@@ -69,7 +75,9 @@ class GPN_LOG_BETA(GPN):
             prediction_confidence_structure=None,
             # sample confidence scores
             sample_confidence_aleatoric=max_soft,
+            sample_confidence_aleatoric_entropy=fo_neg_entropy,
             sample_confidence_epistemic=alpha.sum(-1),
+            sample_confidence_epistemic_entropy=so_neg_entropy,
             sample_confidence_features=alpha_features.sum(-1),
             sample_confidence_structure=None,
         )
