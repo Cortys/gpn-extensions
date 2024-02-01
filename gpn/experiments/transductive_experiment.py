@@ -1,5 +1,6 @@
 import json
 import os
+from gpn.models.model import Model
 
 from gpn.utils.storage import create_storage
 
@@ -156,16 +157,21 @@ class TransductiveExperiment:
         )
         self.results_file_path = results_file_path
 
-        if not self.run_cfg.reeval and not self.run_cfg.retrain and os.path.exists(results_file_path):
+        if (
+            not self.run_cfg.reeval
+            and not self.run_cfg.retrain
+            and os.path.exists(results_file_path)
+        ):
             with open(results_file_path, "r") as f:
                 self.evaluation_results: dict[str, Any] | None = json.load(f)
                 if self.evaluation_results is not None:
                     # If cached eval results don't contain all metrics, re-evaluate
                     eval_res_keys = list(self.evaluation_results.keys())
                     if self.data_cfg.ood_flag:
-                        metrics = self.metrics + self.ood_metrics
+                        metric_names = self.metrics + self.ood_metrics
                     else:
-                        metrics = self.metrics
+                        metric_names = self.metrics
+                    metrics = unn.get_metrics(metric_names).keys()
                     for metric in metrics:
                         found = False
                         for res_key in eval_res_keys:
@@ -174,6 +180,7 @@ class TransductiveExperiment:
                                 break
                         if not found:
                             self.evaluation_results = None
+                            print(f"Re-evaluating due to missing metric '{metric}' in '{results_file_path}'.")
                             break
 
     def setup_engine(self) -> None:
@@ -289,13 +296,18 @@ class TransductiveExperiment:
 
         return results
 
-    def train(self) -> History | None:
-        if (
+    def already_trained(self) -> bool:
+        return (
             self.model is None
             or self.dataset is None
             or not self.model.expects_training()
-        ):
+        )
+
+    def train(self) -> History | None:
+        if self.already_trained():
             return None
+        assert self.model is not None
+        assert self.dataset is not None
 
         callbacks = []
         warmup_callbacks = []
@@ -424,7 +436,9 @@ class TransductiveExperiment:
                 f"ood_type={self.data_cfg.ood_type}",
                 f"split={self.data_cfg.split_no}",
                 f"init={self.model_cfg.init_no}",
-                f"results={self.results_file_path}"
+                f"results={self.results_file_path}",
+                f"trained={self.already_trained()}",
+                f"evaluated={self.evaluation_results is not None}",
             ]
         )
         print(f"Starting experiment ({exp_params}).")

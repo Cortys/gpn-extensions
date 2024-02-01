@@ -148,7 +148,7 @@ class ExperimentDataset:
             raise ValueError
 
     def _setup_poisoning(self):
-        # train dataest is perturbed (new train_loader)
+        # train dataset is perturbed (new train_loader)
         # val_loader and ood_loader are based on perturbed val_dataset
         if self.data_cfg.ood_type == 'leave_out_classes':
             set_num_left_out(self.data_cfg)

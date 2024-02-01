@@ -224,7 +224,7 @@
 
 (defn run-eval!
   [{:keys [dataset model setting override
-           dry retrain reeval only-cached no-cache]
+           dry retrain reeval only-cached cache]
     :or {dataset default-datasets
          model default-models
          setting default-settings}}]
@@ -234,11 +234,14 @@
         override (into default-config (map parse-override) override)]
     (print-grid dataset model setting override)
     (when-not dry
-      (log/info "Starting experiments...")
+      (log/info (str "Starting experiments ("
+                     "only-cached=" only-cached ", "
+                     "cache=" cache
+                     ")..."))
       (Thread/sleep 500)
       (run-combinations! dataset model setting override
                          :only-cached only-cached
-                         :only-cached no-cache))
+                         :no-cache (not cache)))
     (log/info "Done.")))
 
 (defn run-acc-rej-table-gen!
@@ -343,8 +346,8 @@
                           :default false
                           :type :with-flag}
                          {:as "No Cache"
-                          :option "no-cache"
-                          :default false
+                          :option "cache"
+                          :default true
                           :type :with-flag}]
                   :runs run-eval!}
                  {:command "acc-rej-tables"
