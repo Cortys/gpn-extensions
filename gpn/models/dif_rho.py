@@ -50,7 +50,7 @@ class DiffusionRho(Model):
             prediction_confidence_structure=p_uc[torch.arange(hard.size(0)), hard],
             # sample confidence scores
             sample_confidence_aleatoric=max_soft,
-            sample_confidence_aleatoric_entropy=fo_neg_entropy
+            sample_confidence_aleatoric_entropy=fo_neg_entropy,
             sample_confidence_epistemic=alpha.sum(-1),
             sample_confidence_epistemic_entropy=so_neg_entropy,
             sample_confidence_features=None,

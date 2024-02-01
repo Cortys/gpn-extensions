@@ -62,6 +62,7 @@ class TransductiveExperiment:
             "avg_prediction_confidence_aleatoric",
             "avg_prediction_confidence_epistemic",
             "avg_sample_confidence_aleatoric",
+            "avg_sample_confidence_aleatoric_entropy",
             "avg_sample_confidence_epistemic",
             "avg_sample_confidence_epistemic_entropy",
             "avg_sample_confidence_features",
@@ -70,6 +71,7 @@ class TransductiveExperiment:
             "accuracy_rejection_prediction_confidence_aleatoric",
             "accuracy_rejection_prediction_confidence_epistemic",
             "accuracy_rejection_sample_confidence_aleatoric",
+            "accuracy_rejection_sample_confidence_aleatoric_entropy",
             "accuracy_rejection_sample_confidence_epistemic",
             "accuracy_rejection_sample_confidence_epistemic_entropy",
         ]
@@ -78,7 +80,7 @@ class TransductiveExperiment:
             self.train_metrics = ["accuracy", "ce"]
         else:
             # Leave out accuracy rejections curves for training
-            self.train_metrics = self.metrics[:-5]
+            self.train_metrics = self.metrics[:-6]
 
         self.ood_metrics = [
             # metrics for ood detection (id vs ood)
@@ -99,6 +101,7 @@ class TransductiveExperiment:
             "ood_avg_prediction_confidence_aleatoric",
             "ood_avg_prediction_confidence_epistemic",
             "ood_avg_sample_confidence_aleatoric",
+            "ood_avg_sample_confidence_aleatoric_entropy",
             "ood_avg_sample_confidence_epistemic",
             "ood_avg_sample_confidence_epistemic_entropy",
             "ood_avg_sample_confidence_neighborhood",
@@ -109,6 +112,7 @@ class TransductiveExperiment:
             "id_avg_prediction_confidence_aleatoric",
             "id_avg_prediction_confidence_epistemic",
             "id_avg_sample_confidence_aleatoric",
+            "id_avg_sample_confidence_aleatoric_entropy",
             "id_avg_sample_confidence_epistemic",
             "id_avg_sample_confidence_epistemic_entropy",
             "id_avg_sample_confidence_features",
@@ -145,15 +149,32 @@ class TransductiveExperiment:
         self.storage = storage
         self.storage_params = storage_params
 
-        if not self.run_cfg.reeval:
-            results_file_path = storage.create_results_file_path(
-                self.model_cfg.model_name,
-                storage_params,
-                init_no=self.model_cfg.init_no,
-            )
-            if os.path.exists(results_file_path):
-                with open(results_file_path, "r") as f:
-                    self.evaluation_results = json.load(f)
+        results_file_path = storage.create_results_file_path(
+            self.model_cfg.model_name,
+            storage_params,
+            init_no=self.model_cfg.init_no,
+        )
+        self.results_file_path = results_file_path
+
+        if not self.run_cfg.reeval and os.path.exists(results_file_path):
+            with open(results_file_path, "r") as f:
+                self.evaluation_results: dict[str, Any] | None = json.load(f)
+                if self.evaluation_results is not None:
+                    # If cached eval results don't contain all metrics, re-evaluate
+                    eval_res_keys = list(self.evaluation_results.keys())
+                    if self.data_cfg.ood_flag:
+                        metrics = self.metrics + self.ood_metrics
+                    else:
+                        metrics = self.metrics
+                    for metric in metrics:
+                        found = False
+                        for res_key in eval_res_keys:
+                            if metric in res_key:
+                                found = True
+                                break
+                        if not found:
+                            self.evaluation_results = None
+                            break
 
     def setup_engine(self) -> None:
         assert self.dataset is not None
@@ -403,6 +424,7 @@ class TransductiveExperiment:
                 f"ood_type={self.data_cfg.ood_type}",
                 f"split={self.data_cfg.split_no}",
                 f"init={self.model_cfg.init_no}",
+                f"results={self.results_file_path}"
             ]
         )
         print(f"Starting experiment ({exp_params}).")

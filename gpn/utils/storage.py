@@ -7,7 +7,12 @@ from sacred import Experiment
 from tinydb import Query, TinyDB
 from tinydb_serialization import SerializationMiddleware, Serializer
 
-from gpn.utils.config import DataConfiguration, ModelConfiguration, RunConfiguration, TrainingConfiguration
+from gpn.utils.config import (
+    DataConfiguration,
+    ModelConfiguration,
+    RunConfiguration,
+    TrainingConfiguration,
+)
 
 
 class ModelExistsError(Exception):
@@ -157,8 +162,9 @@ class Storage:
 
         # more than one matching document: search ambiguous, raise Error
         if len(documents) > 1:
+            document_ids = [d["id"] for d in documents]
             raise RuntimeError(
-                f"Found more than one matching entry (artficat_type={artifact_type}, params={params}"
+                f"Found more than one matching entry (artficat_type={artifact_type}, params={params}): {document_ids}"
             )
 
         # exactly 1 document found, i.e. some models with same configuration
@@ -287,11 +293,15 @@ class Storage:
         )
 
         documents = []
+        default_ignore = set(ModelConfiguration.default_ignore())
+        match_keyset = set(match_condition.keys())
         for document in raw_documents:
             document_id = document.doc_id
             document = dict(document)
             document["id"] = document_id
-            documents.append(document)
+            doc_keyset = set(document["params"].keys()) - default_ignore
+            if doc_keyset == match_keyset:
+                documents.append(document)
 
         return documents
 

@@ -171,6 +171,16 @@ def get_metric(metric: str):
             uncertainty_type="aleatoric",
         )
 
+    if metric == "avg_sample_confidence_aleatoric_entropy":
+        return metric, lambda y_hat, y: _metric_wrapper(
+            average_confidence,
+            y_hat,
+            y,
+            key=None,
+            confidence_type="sample",
+            uncertainty_type="aleatoric",
+        )
+
     if metric == "avg_sample_confidence_epistemic":
         return metric, lambda y_hat, y: _metric_wrapper(
             average_confidence,
@@ -241,6 +251,15 @@ def get_metric(metric: str):
             y,
             confidence_type="sample",
             uncertainty_type="aleatoric",
+        )
+
+    if metric == "accuracy_rejection_sample_confidence_aleatoric_entropy":
+        return metric, lambda y_hat, y: _metric_wrapper(
+            accuracy_rejection_curve,
+            y_hat,
+            y,
+            confidence_type="sample",
+            uncertainty_type="aleatoric_entropy",
         )
 
     if metric == "accuracy_rejection_sample_confidence_epistemic":
@@ -445,6 +464,19 @@ def get_metric(metric: str):
             uncertainty_type="aleatoric",
         )
 
+    if metric == "ood_avg_sample_confidence_aleatoric_entropy":
+        return metric, lambda y_hat, y, y_hat_ood, y_ood: _ood_metric_wrapper(
+            average_confidence,
+            y_hat,
+            y,
+            y_hat_ood,
+            y_ood,
+            key=None,
+            setting="ood",
+            confidence_type="sample",
+            uncertainty_type="aleatoric_entropy",
+        )
+
     if metric == "ood_avg_sample_confidence_epistemic":
         return metric, lambda y_hat, y, y_hat_ood, y_ood: _ood_metric_wrapper(
             average_confidence,
@@ -535,6 +567,19 @@ def get_metric(metric: str):
         )
 
     if metric == "id_avg_sample_confidence_aleatoric":
+        return metric, lambda y_hat, y, y_hat_ood, y_ood: _ood_metric_wrapper(
+            average_confidence,
+            y_hat,
+            y,
+            y_hat_ood,
+            y_ood,
+            key=None,
+            setting="id",
+            confidence_type="sample",
+            uncertainty_type="aleatoric",
+        )
+
+    if metric == "id_avg_sample_confidence_aleatoric_entropy":
         return metric, lambda y_hat, y, y_hat_ood, y_ood: _ood_metric_wrapper(
             average_confidence,
             y_hat,

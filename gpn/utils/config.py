@@ -245,7 +245,8 @@ class ModelConfiguration(HalfFrozenObject):
     # scoring
     temperature: float = attr.ib(default=None)
 
-    def default_ignore(self) -> List[str]:
+    @staticmethod
+    def default_ignore() -> List[str]:
         """define default attributes to ignore when loading/storing models"""
 
         ignore = [
@@ -257,9 +258,6 @@ class ModelConfiguration(HalfFrozenObject):
             "dim_features",
             "num_classes"
         ]
-
-        for i in ignore:
-            assert hasattr(self, i)
 
         return ignore
 
