@@ -156,7 +156,7 @@ class TransductiveExperiment:
         )
         self.results_file_path = results_file_path
 
-        if not self.run_cfg.reeval and os.path.exists(results_file_path):
+        if not self.run_cfg.reeval and not self.run_cfg.retrain and os.path.exists(results_file_path):
             with open(results_file_path, "r") as f:
                 self.evaluation_results: dict[str, Any] | None = json.load(f)
                 if self.evaluation_results is not None:

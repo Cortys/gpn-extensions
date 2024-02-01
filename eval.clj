@@ -147,12 +147,18 @@
 
 (defn get-combination-results
   [dataset-name model-name setting-name overrides
-   & {:keys [only-cached] :or {only-cached false}}]
+   & {:keys [only-cached no-cache]
+      :or {only-cached false no-cache false}}]
+  (assert (not (and only-cached no-cache))
+          "only-cached and no-cache cannot be enabled at the same time.")
   (let [combination-id (stringify-combination dataset-name
                                               model-name
                                               setting-name)
         results-path (str "results/" combination-id ".json")]
-    (if (and (not (:run.reeval overrides)) (fs/exists? results-path))
+    (if (and (not (:run.retrain overrides))
+             (not (:run.reeval overrides))
+             (not no-cache)
+             (fs/exists? results-path))
       (log/debug "Loading" combination-id "from cache...")
       (if only-cached
         (throw (Exception. (str "No cached results for" combination-id)))
@@ -191,6 +197,49 @@
   [dataset-name model-name types]
   (first (eduction (keep #(apply get-acc-rej-curve dataset-name model-name %))
                    types)))
+
+(defn print-grid
+  [dataset-names model-names setting-names overrides]
+  (println "Datasets:")
+  (doseq [dataset dataset-names]
+    (println "-" dataset))
+  (println "\nModels:")
+  (doseq [model model-names]
+    (println "-" model))
+  (println "\nSettings:")
+  (doseq [setting setting-names]
+    (println "-" setting))
+  (println "\nOverrides:")
+  (doseq [[k v] overrides]
+    (println "-" k "=" v)))
+
+(defn parse-override
+  [override]
+  (let [[k v] (str/split override #"=" 2)
+        k (str/trim k)
+        v (str/trim v)]
+    (assert k)
+    (assert v)
+    [(keyword k) v]))
+
+(defn run-eval!
+  [{:keys [dataset model setting override
+           dry retrain reeval only-cached no-cache]
+    :or {dataset default-datasets
+         model default-models
+         setting default-settings}}]
+  (let [default-config (cond-> {}
+                         retrain (assoc :run.retrain true)
+                         reeval (assoc :run.reeval true))
+        override (into default-config (map parse-override) override)]
+    (print-grid dataset model setting override)
+    (when-not dry
+      (log/info "Starting experiments...")
+      (Thread/sleep 500)
+      (run-combinations! dataset model setting override
+                         :only-cached only-cached
+                         :only-cached no-cache))
+    (log/info "Done.")))
 
 (defn run-acc-rej-table-gen!
   [dataset type]
@@ -236,48 +285,6 @@
         csv (str/join "\n" (cons head body))]
     (spit (str "tables/acc_rej_" type "_" (dataset-colnames dataset dataset) ".csv") csv)))
 
-(defn print-grid
-  [dataset-names model-names setting-names overrides]
-  (println "Datasets:")
-  (doseq [dataset dataset-names]
-    (println "-" dataset))
-  (println "\nModels:")
-  (doseq [model model-names]
-    (println "-" model))
-  (println "\nSettings:")
-  (doseq [setting setting-names]
-    (println "-" setting))
-  (println "\nOverrides:")
-  (doseq [[k v] overrides]
-    (println "-" k "=" v)))
-
-(defn parse-override
-  [override]
-  (let [[k v] (str/split override #"=" 2)
-        k (str/trim k)
-        v (str/trim v)]
-    (assert k)
-    (assert v)
-    [(keyword k) v]))
-
-(defn run-eval!
-  [{:keys [dataset model setting override
-           dry retrain reeval only-cached]
-    :or {dataset default-datasets
-         model default-models
-         setting default-settings}}]
-  (let [default-config (cond-> {}
-                         retrain (assoc :run.retrain true)
-                         reeval (assoc :run.reeval true))
-        override (into default-config (map parse-override) override)]
-    (print-grid dataset model setting override)
-    (when-not dry
-      (log/info "Starting experiments...")
-      (Thread/sleep 500)
-      (run-combinations! dataset model setting override
-                         :only-cached only-cached))
-    (log/info "Done.")))
-
 (defn run-acc-rej-tables-gen!
   [& _]
   (log/info "Generating accuracy-rejection tables...")
@@ -285,6 +292,12 @@
           type ["sample" "sample_aleatoric" "sample_epistemic"
                 "prediction" "prediction_aleatoric" "prediction_epistemic"]]
     (run-acc-rej-table-gen! dataset type))
+  (log/info "Done."))
+
+(defn run-id-ood-table-gen!
+  [& _]
+  (log/info "Generating ID-OOD table...")
+
   (log/info "Done."))
 
 (def CLI-CONFIGURATION
@@ -328,11 +341,18 @@
                          {:as "Only Cached"
                           :option "only-cached"
                           :default false
+                          :type :with-flag}
+                         {:as "No Cache"
+                          :option "no-cache"
+                          :default false
                           :type :with-flag}]
                   :runs run-eval!}
                  {:command "acc-rej-tables"
-                  :description "Generate a results CSV."
-                  :runs run-acc-rej-tables-gen!}]})
+                  :description "Generate acc-rej CSVs."
+                  :runs run-acc-rej-tables-gen!}
+                 {:command "id-ood-tables"
+                  :description "Generate ID-OOD CSV."
+                  :runs run-id-ood-table-gen!}]})
 
 (defn -main
   [& args]
