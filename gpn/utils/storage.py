@@ -50,13 +50,16 @@ class Storage:
         self,
         base_directory: str,
         experiment_name: str = "",
+        eval_experiment_name: str = "",
         experiment: Optional[Experiment] = None,
         lock_timeout: int = 10,
         allow_override: bool = False,
     ):
-        cache_dir = os.path.join(base_directory, experiment_name)
+        cache_dir = os.path.join(base_directory, eval_experiment_name)
         os.makedirs(cache_dir, exist_ok=True)
 
+        self.experiment_name = experiment_name
+        self.eval_experiment_name = eval_experiment_name
         self.experiment = experiment
         self.cache_dir = cache_dir
         self.lock_timeout = lock_timeout
@@ -149,8 +152,13 @@ class Storage:
         return model_file_path
 
     def build_results_file_path(self, path: str, init_no: int = 1) -> str:
-        # final model path, file-name is simply based on init_no
-        results_file_name = f"results_{init_no}.json"
+        # final results path, file-name is simply based on init_no
+        if self.experiment_name != self.eval_experiment_name:
+            prefix = f"_{self.experiment_name}"
+        else:
+            prefix = ""
+
+        results_file_name = f"results{prefix}_{init_no}.json"
         results_file_path = os.path.join(path, results_file_name)
 
         return results_file_path
@@ -300,7 +308,11 @@ class Storage:
             document = dict(document)
             document["id"] = document_id
             doc_keyset = set(document["params"].keys()) - default_ignore
-            if doc_keyset == match_keyset:
+            diff = doc_keyset - match_keyset
+            for key in list(diff):
+                if key.startswith("ood_"):
+                    diff.remove(key)
+            if len(diff) == 0:
                 documents.append(document)
 
         return documents
@@ -320,7 +332,8 @@ def create_storage(
 
     storage = Storage(
         run_cfg.experiment_directory,
-        experiment_name=run_cfg.eval_experiment_name,
+        experiment_name=run_cfg.experiment_name,
+        eval_experiment_name=run_cfg.eval_experiment_name,
         experiment=ex,
         allow_override=run_cfg.retrain,
     )

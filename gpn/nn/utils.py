@@ -305,6 +305,30 @@ def get_metric(metric: str):
             uncertainty_type="aleatoric",
         )
 
+    if metric == "ood_detection_aleatoric_entropy_auroc":
+        return metric, lambda y_hat, y, y_hat_ood, y_ood: _ood_metric_wrapper(
+            ood_detection,
+            y_hat,
+            y,
+            y_hat_ood,
+            y_ood,
+            key=None,
+            score_type="AUROC",
+            uncertainty_type="aleatoric_entropy",
+        )
+
+    if metric == "ood_detection_aleatoric_entropy_apr":
+        return metric, lambda y_hat, y, y_hat_ood, y_ood: _ood_metric_wrapper(
+            ood_detection,
+            y_hat,
+            y,
+            y_hat_ood,
+            y_ood,
+            key=None,
+            score_type="APR",
+            uncertainty_type="aleatoric_entropy",
+        )
+
     if metric == "ood_detection_epistemic_auroc":
         return metric, lambda y_hat, y, y_hat_ood, y_ood: _ood_metric_wrapper(
             ood_detection,

@@ -11,5 +11,6 @@
             "customJackInCommandLine": "poetry run bb --nrepl-server JACK-IN-NREPL-PORT"
         }
     ],
-    "calva.redirectServerOutputToRepl": true
+    "calva.redirectServerOutputToRepl": true,
+    "jupyter.debugJustMyCode": true
 }

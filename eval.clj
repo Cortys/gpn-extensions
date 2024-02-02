@@ -44,23 +44,28 @@
    "ood_loc" {}
    "ood_features_normal" {::name "ood_features"
                           ::depends-on "classification"
-                          :data.ood_perturbation_type "normal"}
+                          :data.ood_perturbation_type "normal"
+                          :run.experiment_name "ood_features_normal"}
    "ood_features_ber" {::name "ood_features"
                        ::depends-on "classification"
-                       :data.ood_perturbation_type "bernoulli_0.5"}})
+                       :data.ood_perturbation_type "bernoulli_0.5"
+                       :run.experiment_name "ood_features_ber"}})
 
 (def combination-overrides
   {{::model "gpn_lop" ::dataset "PubMedFull"}
    {:run.log "True"}
    {::model "gpn_lop" ::dataset "ogbn-arxiv"}
-   {:model.sparse_x_prune_threshold 0.01}})
+   {:model.sparse_x_prune_threshold 0.01
+    :run.num_inits 1}
+   {::model "gdk" ::dataset "ogbn-arxiv"}
+   {:model.gdk_cutoff 2}})
 
 (def default-datasets ["CoraML"
                        "CiteSeerFull"
                        "AmazonPhotos"
                        "AmazonComputers"
                        "PubMedFull"
-                       #_"ogbn-arxiv"])
+                       "ogbn-arxiv"])
 (def default-models ["appnp"
                      #_"ggp"
                      "gdk" ; no training, enable after adding acc-rej
@@ -77,16 +82,17 @@
   {"gpn_rw" "gpnRW"
    "gpn_lop" "gpnLOP"})
 
+(def setting-colnames
+  {"ood_loc" "oodLoc"
+   "ood_features_normal" "oodNormal"
+   "ood_features_ber" "oodBer"})
+
 (defn run-config!
-  [config & {:keys [::depends-on] :as overrides}]
+  [config & {:as overrides}]
   (let [args (keep (fn [[k v]]
                      (when-not (namespace k)
                        (str (name k) "=" v)))
                    overrides)]
-    (when depends-on
-      (log/info "Running dependency...")
-      (apply run-config! depends-on)
-      (log/info "Ran dependency. Continuing with parent..."))
     (log/info "Running with" config (str/join " " args))
     (try
       (apply shell "python3 train_and_eval.py" "--force"
@@ -116,7 +122,6 @@
                        (datasets dataset-name))
         model (merge {::name model-name} (models model-name))
         setting (merge {::name setting-name} (settings setting-name))
-        setting-dep (::depends-on setting)
         combination-overrides
         (apply merge
                (for [d [nil [::dataset dataset-name]]
@@ -126,11 +131,6 @@
                      :when c]
                  c))]
     [(build-config-path dataset model setting)
-     ::depends-on (when setting-dep
-                    (build-config-cli-params dataset-name
-                                             model-name
-                                             setting-dep
-                                             overrides))
      (dissoc (merge dataset model setting combination-overrides overrides)
              ::name)]))
 
@@ -138,12 +138,18 @@
   [dataset-name model-name setting-name]
   (str setting-name "/" dataset-name "/" model-name))
 
-(defn run-combination!
-  [dataset-name model-name setting-name overrides]
-  (apply run-config! (build-config-cli-params dataset-name
-                                              model-name
-                                              setting-name
-                                              overrides)))
+(defn- valid-var?
+  [var]
+  (cond
+    (vector? var) (every? valid-var? var)
+    (number? var) (not (Double/isNaN var))
+    :else false))
+
+(defn recurse
+  [f x]
+  (if (vector? x)
+    (mapv (partial recurse f) x)
+    (f x)))
 
 (defn get-combination-results
   [dataset-name model-name setting-name overrides
@@ -154,22 +160,39 @@
   (let [combination-id (stringify-combination dataset-name
                                               model-name
                                               setting-name)
-        results-path (str "results/" combination-id ".json")]
+        results-path (str "results/" combination-id ".json")
+        params (build-config-cli-params dataset-name
+                                        model-name
+                                        setting-name
+                                        (assoc overrides :run.results_path results-path))]
     (if (and (not (:run.retrain overrides))
              (not (:run.reeval overrides))
              (not no-cache)
              (fs/exists? results-path))
       (log/debug "Loading" combination-id "from cache...")
       (if only-cached
-        (throw (Exception. (str "No cached results for" combination-id)))
+        (throw (ex-info (str "No cached results for " combination-id)
+                        {:dataset-name dataset-name
+                         :model-name model-name
+                         :setting-name setting-name
+                         :overrides overrides}))
         (do
           (log/info "Running" combination-id "...")
           (fs/create-dirs (fs/parent results-path))
-          (run-combination! dataset-name
-                            model-name
-                            setting-name
-                            (assoc overrides :run.results_path results-path)))))
-    (json/parse-stream (io/reader results-path) true)))
+          (apply run-config! params))))
+    (let [results (json/parse-stream (io/reader results-path) true)
+          overrides (last params)
+          samples (* (:run.num_splits overrides) (:run.num_inits overrides))
+          results (into results
+                        (comp (filter #(-> % first name (str/ends-with? "_var")))
+                              (filter #(-> % second valid-var?))
+                              (keep (fn [[k v]]
+                                      (let [k (name k)
+                                            k (keyword (str (subs k 0 (- (count k) 4)) "_se"))]
+                                        (when-not (contains? results k)
+                                          [k (recurse #(Math/sqrt (/ % samples)) v)])))))
+                        results)]
+      results)))
 
 (defn run-combinations!
   [dataset-names model-names setting-names overrides & {:as opts}]
@@ -180,18 +203,24 @@
 
 (defn get-acc-rej-curve
   [dataset-name model-name confidence-type uncertainty-type]
-  (let [key (str "accuracy_rejection_" confidence-type "_confidence_"
-                 uncertainty-type)
-        mean-kw (keyword key)
-        var-kw (keyword (str key "_var"))
-        results (get-combination-results dataset-name model-name
-                                         "classification" {}
-                                         :only-cached true)
-        results (:test results)
-        mean (mean-kw results)]
-    (when mean
-      {:mean mean
-       :var (var-kw results)})))
+  (try
+    (let [key (str "accuracy_rejection_" confidence-type "_confidence_"
+                   uncertainty-type)
+          mean-kw (keyword key)
+          var-kw (keyword (str key "_var"))
+          se-kw (keyword (str key "_se"))
+          results (get-combination-results dataset-name model-name
+                                           "classification" {}
+                                           :only-cached true)
+          results (:test results)
+          mean (mean-kw results)
+          var (var-kw results)
+          se (se-kw results)]
+      (when mean
+        {:mean mean, :var var, :se se}))
+    (catch clojure.lang.ExceptionInfo e
+      (log/error (ex-message e))
+      nil)))
 
 (defn get-acc-rej-curve-with-fallback
   [dataset-name model-name types]
@@ -255,8 +284,12 @@
                  ["prediction" "aleatoric"]]
                 "sample_aleatoric"
                 [["sample" "aleatoric"]]
+                "sample_aleatoric_entropy"
+                [["sample" "aleatoric_entropy"]]
                 "sample_epistemic"
                 [["sample" "epistemic"]]
+                "sample_epistemic_entropy"
+                [["sample" "epistemic_entropy"]]
                 "prediction_aleatoric"
                 [["prediction" "aleatoric"]]
                 "prediction_epistemic"
@@ -273,17 +306,19 @@
                                  (comp
                                   (map #(get model-colnames % %))
                                   (mapcat #(do [(str % "Mean")
-                                                (str % "Var")])))
+                                                (str % "Var")
+                                                (str % "SE")])))
                                  models))
         body (for [i (range N)
                    :let [p (double (/ i (dec N)))]]
                (str/join ","
                          (into [p]
                                (mapcat (fn [model]
-                                         (let [{:keys [mean var]}
+                                         (let [{:keys [mean var se]}
                                                (curves model)]
                                            [(get mean i)
-                                            (get var i)]))
+                                            (get var i 0)
+                                            (get se i 0)]))
                                        models))))
         csv (str/join "\n" (cons head body))]
     (spit (str "tables/acc_rej_" type "_" (dataset-colnames dataset dataset) ".csv") csv)))
@@ -292,15 +327,27 @@
   [& _]
   (log/info "Generating accuracy-rejection tables...")
   (doseq [dataset default-datasets
-          type ["sample" "sample_aleatoric" "sample_epistemic"
-                "prediction" "prediction_aleatoric" "prediction_epistemic"]]
+          type ["sample"
+                "sample_aleatoric" "sample_epistemic"
+                "sample_aleatoric_entropy" "sample_epistemic_entropy"
+                "prediction"
+                "prediction_aleatoric" "prediction_epistemic"]]
     (run-acc-rej-table-gen! dataset type))
   (log/info "Done."))
 
 (defn run-id-ood-table-gen!
   [& _]
   (log/info "Generating ID-OOD table...")
-
+  (let [datasets ["CoraML" "CiteSeerFull" "AmazonPhotos" "AmazonComputers" "PubMedFull"]
+        models ["appnp" "gdk" "gpn" "gpn_rw" "gpn_lop"]
+        settings ["ood_loc" "ood_features_normal" "ood_features_ber"]
+        cols (into ["dataset" "model"]
+                   (mapcat (fn [setting]
+                             (let [setting (setting-colnames setting)]
+                               [(str setting "IdAcc")
+                                (str setting "IdAccSE")
+                                (str setting "SE")])))
+                   settings)])
   (log/info "Done."))
 
 (def CLI-CONFIGURATION

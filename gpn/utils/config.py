@@ -237,6 +237,9 @@ class ModelConfiguration(HalfFrozenObject):
     )
     epochs: int = attr.ib(default=None)
 
+    # GDK
+    gdk_cutoff: int = attr.ib(default=None)
+
     # dropout / ensemble
     num_samples_dropout: int = attr.ib(default=None)
     ensemble_min_init_no: int = attr.ib(default=None)

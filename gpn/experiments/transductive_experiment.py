@@ -87,6 +87,8 @@ class TransductiveExperiment:
             # metrics for ood detection (id vs ood)
             "ood_detection_aleatoric_apr",
             "ood_detection_aleatoric_auroc",
+            "ood_detection_aleatoric_entropy_apr",
+            "ood_detection_aleatoric_entropy_auroc",
             "ood_detection_epistemic_apr",
             "ood_detection_epistemic_auroc",
             "ood_detection_epistemic_entropy_apr",
@@ -456,7 +458,7 @@ class TransductiveExperiment:
         if (
             self.model is not None
             and self.run_cfg.save_model
-            and self.training_completed
+            and (self.training_completed or self.model_cfg.model_name == "GDK")
         ):
             self.model.save_to_storage()
 

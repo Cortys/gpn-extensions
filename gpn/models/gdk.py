@@ -26,7 +26,12 @@ class GDK(Model):
 
     def forward_impl(self, data: Data) -> Prediction:
         if self.cached_alpha is None:
-            distance_evidence = compute_kde(data, self.params.num_classes, sigma=1.0)
+            cutoff = self.params.gdk_cutoff
+            if cutoff is None:
+                cutoff = 10
+            distance_evidence = compute_kde(
+                data, self.params.num_classes,
+                sigma=1.0, cutoff=cutoff)
             alpha = 1.0 + distance_evidence
             self.cached_alpha = alpha
 
@@ -85,7 +90,7 @@ def kernel_distance(x: Tensor, sigma: float = 1.0) -> Tensor:
     return sigma_scale * k_dis
 
 
-def compute_kde(data: Data, num_classes: int, sigma: float = 1.0) -> Tensor:
+def compute_kde(data: Data, num_classes: int, sigma: float = 1.0, cutoff=10) -> Tensor:
     transform = T.AddSelfLoops()
     data = transform(data)
     n_nodes = data.y.size(0)
@@ -95,7 +100,7 @@ def compute_kde(data: Data, num_classes: int, sigma: float = 1.0) -> Tensor:
     G = to_networkx(data, to_undirected=True)
 
     for idx_t in idx_train:
-        distances = single_source_shortest_path_length(G, source=idx_t, cutoff=10)
+        distances = single_source_shortest_path_length(G, source=idx_t, cutoff=cutoff)
         distances = torch.Tensor(
             [distances[n] if n in distances else 1e10 for n in range(n_nodes)]
         ).to(data.y.device)
