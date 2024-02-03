@@ -79,6 +79,7 @@ class GPFLOWGGP(Model):
     # storing / loading model
     # (e.g. for evasion experiments)
     def save_to_file(self, model_path: str) -> None:
+        assert self.model is not None
         frozen_model = gpflow.utilities.freeze(self.model)
         module_to_save = tf.Module()
         predict_fn = tf.function(

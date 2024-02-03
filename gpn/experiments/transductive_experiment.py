@@ -458,7 +458,8 @@ class TransductiveExperiment:
         if (
             self.model is not None
             and self.run_cfg.save_model
-            and (self.training_completed or self.model_cfg.model_name == "GDK")
+            and (self.training_completed
+                 or self.model_cfg.model_name in ("GDK", "GGP", "MaternGGP"))
         ):
             self.model.save_to_storage()
 

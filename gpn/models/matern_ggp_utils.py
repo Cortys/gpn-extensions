@@ -39,9 +39,9 @@ class GraphMaternKernel(gpflow.kernels.Kernel):
     def __init__(
         self,
         eigenpairs,
-        nu=3,
-        kappa=4,
-        sigma_f=1,
+        nu: float = 3,
+        kappa: float = 4,
+        sigma_f: float = 1,
         vertex_dim=0,
         point_kernel: gpflow.kernels.Kernel | None = None,
         active_dims=None,
@@ -101,6 +101,7 @@ class GraphMaternKernel(gpflow.kernels.Kernel):
             X2_id = tf.reshape(tf.cast(X2[:, 0], dtype=tf.int32), [-1, 1])
             K = self._eval_K_vertex(X_id, X2_id)
         else:
+            assert self.point_kernel is not None
             X_id, X_v = tf.reshape(tf.cast(X[:, 0], dtype=tf.int32), [-1, 1]), X[:, 1:]
             X2_id, X2_v = (
                 tf.reshape(tf.cast(X2[:, 0], dtype=tf.int32), [-1, 1]),
@@ -151,15 +152,24 @@ class GPInducingVariables(InducingVariables):
     Note that vertex indices are not trainable.
     """
 
-    def __init__(self, x):
+    def __init__(self, x, num_classes=1):
         self.x_id = x[:, :1]
         if len(x.shape) > 1:
             self.x_v = gpflow.Parameter(x[:, 1:], dtype=gpflow.default_float())  # type: ignore
 
         self.N = self.x_id.shape[0]
+        self.num_classes = num_classes
 
-    def __len__(self):
+    @property
+    def num_inducing(self):
         return self.N
+
+    @property
+    def shape(self):
+        M = self.N
+        D = 1 + self.x_v.shape[1]
+        P = self.num_classes
+        return (M, D, P)
 
     @property
     def GP_IV(self):
@@ -169,7 +179,7 @@ class GPInducingVariables(InducingVariables):
 
 @cov.Kuu.register(GPInducingVariables, gpflow.kernels.Kernel)
 def Kuu_kernel_GPinducingvariables(
-    inducing_variable: InducingVariables, kernel: Kernel, jitter=0.0
+    inducing_variable: GPInducingVariables, kernel: Kernel, jitter=0.0
 ):
     GP_IV = inducing_variable.GP_IV
 
@@ -181,7 +191,7 @@ def Kuu_kernel_GPinducingvariables(
 
 @cov.Kuf.register(GPInducingVariables, gpflow.kernels.Kernel, TensorLike)
 def Kuf_kernel_GPinducingvariables(
-    inducing_variable: InducingVariables, kernel: Kernel, X: tf.Tensor
+    inducing_variable: GPInducingVariables, kernel: Kernel, X: tf.Tensor
 ):
     GP_IV = inducing_variable.GP_IV
 

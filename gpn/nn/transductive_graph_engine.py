@@ -429,7 +429,7 @@ class TransductiveGraphEngine(Engine):
 
         self._exec_callbacks(callbacks, "after_predictions")
 
-        if self.device is not None and self.device != "cpu":
+        if self.device is not None and isinstance(self.device, torch.device) and self.device.type == "cuda":
             torch.cuda.synchronize(self.device)
 
         evals = self.collate_evals(evals)
