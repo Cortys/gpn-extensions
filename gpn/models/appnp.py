@@ -62,6 +62,8 @@ class APPNP(Model):
             prediction_confidence_epistemic=None,
             prediction_confidence_structure=None,
             # confidence of sample
+            sample_confidence_total=max_soft,
+            sample_confidence_total_entropy=neg_entropy,
             sample_confidence_aleatoric=max_soft,
             sample_confidence_aleatoric_entropy=neg_entropy,
             sample_confidence_epistemic=None,

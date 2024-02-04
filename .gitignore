@@ -8,6 +8,7 @@ saved_experiments/**
 results
 !results/.gitkeep
 tables
+graphs
 
 data/**
 !data/README.md

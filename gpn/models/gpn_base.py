@@ -125,10 +125,14 @@ class GPN(Model):
         soft = alpha / alpha.sum(-1, keepdim=True)
         logits = None
         log_soft = soft.log()
-
         max_soft, hard = soft.max(dim=-1)
 
+        mode = beta / beta.sum(-1, keepdim=True)
+        log_mode = mode.log()
+        max_mode, mode_hard = mode.max(dim=-1)
+
         fo_neg_entropy = categorical_entropy_reg(soft, 1, reduction="none")
+        fo_neg_entropy_mode = categorical_entropy_reg(soft, 1, reduction="none")
         so_neg_entropy = entropy_reg(
             alpha_features, 1, approximate=True, reduction="none"
         )
@@ -140,6 +144,9 @@ class GPN(Model):
             soft=soft,
             log_soft=log_soft,
             hard=hard,
+            mode_soft=mode,
+            log_mode_soft=log_mode,
+            mode_hard=mode_hard,
             logits=logits,
             latent=z,
             latent_features=z,
@@ -153,10 +160,15 @@ class GPN(Model):
             prediction_confidence_epistemic=alpha[torch.arange(hard.size(0)), hard],
             prediction_confidence_structure=None,
             # sample confidence scores
-            sample_confidence_aleatoric=max_soft,
-            sample_confidence_aleatoric_entropy=fo_neg_entropy,
+            sample_confidence_total=max_soft,
+            sample_confidence_total_entropy=fo_neg_entropy,
+            sample_confidence_aleatoric=max_mode,
+            sample_confidence_aleatoric_entropy=fo_neg_entropy_mode,
             sample_confidence_epistemic=alpha.sum(-1),
             sample_confidence_epistemic_entropy=so_neg_entropy,
+            sample_confidence_epistemic_diff=max_soft - max_mode,
+            sample_confidence_epistemic_entropy_diff=fo_neg_entropy
+            - fo_neg_entropy_mode,
             sample_confidence_features=alpha_features.sum(-1),
             sample_confidence_structure=None,
         )

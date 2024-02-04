@@ -38,6 +38,7 @@
           ::inline-name "GGP"
           :run.num_inits 1}
    "matern_ggp" {::name "matern_ggp"
+                 ::colname "maternGGP"
                  ::inline-name "Matern-GGP"
                  :run.num_inits 1}
    "gdk" {::name "gdk" ::inline-name "GKDE"}
@@ -73,7 +74,9 @@
    {:model.sparse_x_prune_threshold 0.01
     :run.num_inits 2}
    {::model "gdk" ::dataset "ogbn-arxiv"}
-   {:model.gdk_cutoff 2}})
+   {:model.gdk_cutoff 2}
+   {::model "matern_ggp" ::dataset "ogbn-arxiv"}
+   {::skip true}})
 
 (def default-datasets ["CoraML"
                        "CiteSeerFull"
@@ -82,7 +85,7 @@
                        "PubMedFull"
                        "ogbn-arxiv"])
 (def default-models ["appnp"
-                     #_"ggp"
+                     "matern_ggp"
                      "gdk"
                      "gpn"
                      "gpn_rw"
@@ -190,6 +193,13 @@
                                         model-name
                                         setting-name
                                         (assoc overrides :run.results_path results-path))]
+    (when (::skip (last params))
+      (throw (ex-info (str "Skipped " combination-id ".")
+                      {::cause :skip
+                       :dataset-name dataset-name
+                       :model-name model-name
+                       :setting-name setting-name
+                       :overrides overrides})))
     (if (and (not (:run.retrain overrides))
              (not (:run.reeval overrides))
              (not no-cache)
@@ -197,7 +207,8 @@
       (log/debug "Loading" combination-id "from cache...")
       (if only-cached
         (throw (ex-info (str "No cached results for " combination-id)
-                        {:dataset-name dataset-name
+                        {::cause :no-cache
+                         :dataset-name dataset-name
                          :model-name model-name
                          :setting-name setting-name
                          :overrides overrides}))
@@ -214,7 +225,9 @@
   (try
     (apply get-results args)
     (catch clojure.lang.ExceptionInfo e
-      (log/error (ex-message e))
+      (if (= (::cause (ex-data e)) :skip)
+        (log/debug (ex-message e))
+        (log/error (ex-message e)))
       nil)))
 
 ;; Run experiments

@@ -162,6 +162,7 @@ class TransductiveExperiment:
         if (
             not self.run_cfg.reeval
             and not self.run_cfg.retrain
+            and not self.run_cfg.job == "predict"
             and os.path.exists(results_file_path)
         ):
             with open(results_file_path, "r") as f:
@@ -200,7 +201,7 @@ class TransductiveExperiment:
             if self.run_cfg.job == "train":
                 raise AssertionError
 
-            if self.run_cfg.job == "evaluate":
+            if self.run_cfg.job in ("evaluate", "predict"):
                 model = Ensemble(self.model_cfg, models=None)
                 model.set_storage(self.storage, self.storage_params)
                 model.load_from_storage()
@@ -216,18 +217,19 @@ class TransductiveExperiment:
                 try:
                     # if it is possible to load model: skip training
                     model.load_from_storage()
-                    self.run_cfg.set_values(job="evaluate")
+                    if self.run_cfg.job == "train":
+                        self.run_cfg.set_values(job="evaluate")
                     model.set_expects_training(False)
                     self.run_cfg.set_values(save_model=False)
 
                     if self.run_cfg.eval_mode == "dropout":
-                        assert self.run_cfg.job == "evaluate"
+                        assert self.run_cfg.job in ("evaluate", "predict")
                         model = DropoutEnsemble(
                             model, num_samples=self.model_cfg.num_samples_dropout
                         )
 
                     elif self.run_cfg.eval_mode == "energy_scoring":
-                        assert self.run_cfg.job == "evaluate"
+                        assert self.run_cfg.job in ("evaluate", "predict")
                         model = EnergyScoring(
                             model, temperature=self.model_cfg.temperature
                         )
@@ -297,6 +299,16 @@ class TransductiveExperiment:
         self.model.write_results(results)
 
         return results
+
+    def predict(self):
+        assert self.model is not None
+        assert self.dataset is not None
+
+        predictions = self.engine.predict(
+            data=self.dataset.val_loader, gpu=self.run_cfg.gpu
+        )
+
+        return predictions
 
     def already_trained(self) -> bool:
         return (
@@ -448,9 +460,13 @@ class TransductiveExperiment:
             self.train()
 
         if self.data_cfg.ood_flag:
+            assert self.run_cfg.job != "predict", "OOD not supported for predict job."
             results = self.evaluate_ood()
         else:
-            results = self.evaluate()
+            if self.run_cfg.job == "predict":
+                results = self.predict()
+            else:
+                results = self.evaluate()
 
         # save trained model
         # or potential values to be cached

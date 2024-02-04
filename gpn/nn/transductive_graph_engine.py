@@ -257,7 +257,10 @@ class TransductiveGraphEngine(Engine):
     ################################################################################
     ### PREDICTIONS
     ################################################################################
-    def predict(self, data, callbacks=None, gpu="auto", parallel=True, **kwargs):
+    def predict(
+            self, data, callbacks=None,
+            gpu: GpuSpec = "auto",
+            parallel=True, **kwargs):
         if callbacks is None:
             callbacks = []
 
@@ -282,7 +285,7 @@ class TransductiveGraphEngine(Engine):
         iterator = iter(data)
         for _ in range(num_iterations):
             item = next(iterator)
-            item = item.to(self.device)
+            item = item.to(device)
 
             with torch.no_grad():
                 out = self.predict_batch(item, **kwargs)

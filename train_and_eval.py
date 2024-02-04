@@ -33,7 +33,7 @@ def config():
 
 
 @ex.automain
-def run_experiment(run: dict, data: dict, model: dict, training: dict) -> dict | None:
+def run_experiment(run: dict, data: dict, model: dict, training: dict) -> dict | list | None:
     """main function to run experiment with sacred support
 
     Args:
@@ -71,6 +71,12 @@ def run_experiment(run: dict, data: dict, model: dict, training: dict) -> dict |
     experiment = MultipleRunExperiment(run_cfg, data_cfg, model_cfg, train_cfg, ex=ex)
 
     results = experiment.run()
+
+    if run_cfg.job == "predict":
+        return results
+
+    assert isinstance(results, dict)
+
     df = results_dict_to_df(results)
 
     # print()

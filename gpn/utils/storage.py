@@ -326,7 +326,8 @@ def create_storage(
     ex: Optional[Experiment] = None,
 ):
     if run_cfg.job == "train" or (
-        run_cfg.job == "evaluate" and run_cfg.eval_experiment_name is None
+        run_cfg.job in ("evaluate", "predict")
+        and run_cfg.eval_experiment_name is None
     ):
         run_cfg.set_values(eval_experiment_name=run_cfg.experiment_name)
 
@@ -346,7 +347,7 @@ def create_storage(
 
     # ignore ood parameters for matching in an evasion setting
     if (
-        run_cfg.job == "evaluate"
+        run_cfg.job in ("evaluate", "predict")
         and data_cfg.ood_flag
         and data_cfg.ood_setting == "evasion"
     ):

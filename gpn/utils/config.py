@@ -34,7 +34,7 @@ class RunConfiguration(HalfFrozenObject):
     # or only in "evaluation" mode (e.g. re-evaluating model,
     # evlulating models on other datasets, or as dropout-models or ensembles)
     job: str = attr.ib(
-        default=None, validator=lambda i, a, v: v in ("train", "evaluate")
+        default=None, validator=lambda i, a, v: v in ("train", "evaluate", "predict")
     )
 
     # save-flag (e.g. for not saving GridSearch experiments)

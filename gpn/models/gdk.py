@@ -42,8 +42,14 @@ class GDK(Model):
         soft = alpha / alpha.sum(-1, keepdim=True)
         max_soft, hard = soft.max(-1)
 
+        mode = distance_evidence / distance_evidence.sum(-1, keepdim=True)
+        max_mode, mode_hard = mode.max(dim=-1)
+
         fo_neg_entropy = categorical_entropy_reg(soft, 1, reduction="none")
-        so_neg_entropy = entropy_reg(alpha, 1, approximate=True, reduction="none")
+        fo_neg_entropy_mode = categorical_entropy_reg(soft, 1, reduction="none")
+        so_neg_entropy = entropy_reg(
+            alpha, 1, approximate=True, reduction="none"
+        )
 
         # ---------------------------------------------------------------------------------
         pred = Prediction(
@@ -58,10 +64,15 @@ class GDK(Model):
                 [torch.arange(hard.size(0)), hard]
             ],
             # sample confidence scores
-            sample_confidence_aleatoric=max_soft,
-            sample_confidence_aleatoric_entropy=fo_neg_entropy,
+            sample_confidence_total=max_soft,
+            sample_confidence_total_entropy=fo_neg_entropy,
+            sample_confidence_aleatoric=max_mode,
+            sample_confidence_aleatoric_entropy=fo_neg_entropy_mode,
             sample_confidence_epistemic=alpha.sum(-1),
             sample_confidence_epistemic_entropy=so_neg_entropy,
+            sample_confidence_epistemic_diff=max_soft - max_mode,
+            sample_confidence_epistemic_entropy_diff=fo_neg_entropy
+            - fo_neg_entropy_mode,
             sample_confidence_features=None,
             sample_confidence_structure=distance_evidence.sum(-1),
         )
