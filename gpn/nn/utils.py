@@ -781,7 +781,7 @@ def get_metric(metric: str):
             key=None,
             setting="id",
             confidence_type="sample",
-            uncertainty_type="total",
+            uncertainty_type="total_entropy",
         )
 
     if metric == "id_avg_sample_confidence_aleatoric":
@@ -807,7 +807,7 @@ def get_metric(metric: str):
             key=None,
             setting="id",
             confidence_type="sample",
-            uncertainty_type="aleatoric",
+            uncertainty_type="aleatoric_entropy",
         )
 
     if metric == "id_avg_sample_confidence_epistemic":

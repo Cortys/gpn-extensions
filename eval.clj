@@ -317,8 +317,13 @@
                 [["sample" "epistemic"]
                  ["sample" "aleatoric"]]
                 "prediction"
-                [["prediction" "epistemic"]
+                [["prediction" "total"]
+                 ["prediction" "epistemic"]
                  ["prediction" "aleatoric"]]
+                "sample_total"
+                [["sample" "total"]]
+                "sample_total_entropy"
+                [["sample" "total_entropy"]]
                 "sample_aleatoric"
                 [["sample" "aleatoric"]]
                 "sample_aleatoric_entropy"
@@ -327,6 +332,8 @@
                 [["sample" "epistemic"]]
                 "sample_epistemic_entropy"
                 [["sample" "epistemic_entropy"]]
+                "sample_epistemic_entropy_diff"
+                [["sample" "epistemic_entropy_diff"]]
                 "prediction_aleatoric"
                 [["prediction" "aleatoric"]]
                 "prediction_epistemic"
@@ -364,10 +371,11 @@
   [& _]
   (log/info "Generating accuracy-rejection tables...")
   (doseq [dataset default-datasets
-          type ["sample"
-                "sample_aleatoric" "sample_epistemic"
-                "sample_aleatoric_entropy" "sample_epistemic_entropy"
-                "prediction"
+          type ["sample" "prediction"
+                "sample_total" "sample_total_entropy"
+                "sample_aleatoric" "sample_aleatoric_entropy"
+                "sample_epistemic" "sample_epistemic_entropy"
+                "sample_epistemic_entropy_diff"
                 "prediction_aleatoric" "prediction_epistemic"]]
     (run-acc-rej-table-gen! dataset type))
   (log/info "Done."))
@@ -387,6 +395,10 @@
                                 (str setting "IdAccSE")
                                 (str setting "OodAcc")
                                 (str setting "OodAccSE")
+                                (str setting "OodTotal")
+                                (str setting "OodTotalSE")
+                                (str setting "OodTotalEntropy")
+                                (str setting "OodTotalEntropySE")
                                 (str setting "OodAleatoric")
                                 (str setting "OodAleatoricSE")
                                 (str setting "OodAleatoricEntropy")
@@ -394,7 +406,9 @@
                                 (str setting "OodEpistemic")
                                 (str setting "OodEpistemicSE")
                                 (str setting "OodEpistemicEntropy")
-                                (str setting "OodEpistemicEntropySE")])))
+                                (str setting "OodEpistemicEntropySE")
+                                (str setting "OodEpistemicEntropyDiff")
+                                (str setting "OodEpistemicEntropyDiffSE")])))
                    setting-names)
         head (str/join "," cols)
         rows (for [d dataset-names, m model-names] [d m])
@@ -416,6 +430,10 @@
                                                   results (:test results)]
                                               [(:id_accuracy results) (:id_accuracy_se results 0)
                                                (:ood_accuracy results) (:ood_accuracy_se results 0)
+                                               (:ood_detection_total_auroc results)
+                                               (:ood_detection_total_auroc_se results 0)
+                                               (:ood_detection_total_entropy_auroc results)
+                                               (:ood_detection_total_entropy_auroc_se results 0)
                                                (:ood_detection_aleatoric_auroc results)
                                                (:ood_detection_aleatoric_auroc_se results 0)
                                                (:ood_detection_aleatoric_entropy_auroc results)
@@ -423,7 +441,9 @@
                                                (:ood_detection_epistemic_auroc results)
                                                (:ood_detection_epistemic_auroc_se results 0)
                                                (:ood_detection_epistemic_entropy_auroc results)
-                                               (:ood_detection_epistemic_entropy_auroc_se results 0)])))
+                                               (:ood_detection_epistemic_entropy_auroc_se results 0)
+                                               (:ood_detection_epistemic_entropy_diff_auroc results)
+                                               (:ood_detection_epistemic_entropy_diff_auroc_se results 0)])))
                                   setting-names))))
               rows)
         csv (str/join "\n" (cons head body))]
