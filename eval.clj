@@ -30,6 +30,7 @@
                         :run.reduced_training_metrics "True"
                         :training.eval_every 10
                         :training.stopping_patience 5
+                        :model.entropy_num_samples 100
                         :run.log "True"})})
 
 (def models
@@ -72,7 +73,6 @@
    {:run.log "True"}
    {::model "gpn_lop" ::dataset "ogbn-arxiv"}
    {:model.sparse_x_prune_threshold 0.01
-    :model.entropy_num_samples 100
     :run.num_inits 2}
    {::model "gdk" ::dataset "ogbn-arxiv"}
    {:model.gdk_cutoff 2}
@@ -238,7 +238,7 @@
   (doseq [dataset-name dataset-names
           model-name model-names
           setting-name setting-names]
-    (get-results dataset-name model-name setting-name overrides opts)))
+    (try-get-results dataset-name model-name setting-name overrides opts)))
 
 (defn print-grid
   [dataset-names model-names setting-names overrides]
