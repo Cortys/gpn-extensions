@@ -1,4 +1,5 @@
 from typing import Dict, Tuple
+from pyro import sample
 import torch
 import numpy as np
 import torch.optim as optim
@@ -45,9 +46,13 @@ class GPFLOWGGP(Model):
             / (var_per_class[torch.arange(hard.size(0)), hard] + var_eps),
             prediction_confidence_structure=None,
             # sample confidence scores
+            sample_confidence_total=max_soft,
+            sample_confidence_total_entropy=neg_entropy,
             sample_confidence_aleatoric=max_soft,
             sample_confidence_aleatoric_entropy=neg_entropy,
             sample_confidence_epistemic=1.0 / (var_per_class.sum(-1) + var_eps),
+            sample_confidence_epistemic_entropy=None,
+            sample_confidence_epistemic_entropy_diff=None,
             sample_confidence_features=None,
             sample_confidence_structure=None,
         )

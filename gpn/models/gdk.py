@@ -10,7 +10,7 @@ from torch_geometric.utils import to_networkx
 from torch_geometric.data import Data
 
 from gpn.utils import Prediction, ModelConfiguration
-from gpn.nn.loss import categorical_entropy_reg, entropy_reg
+from gpn.nn.loss import categorical_entropy_reg, entropy_reg, expected_categorical_entropy
 from .model import Model
 
 
@@ -42,14 +42,20 @@ class GDK(Model):
         soft = alpha / alpha.sum(-1, keepdim=True)
         max_soft, hard = soft.max(-1)
 
-        mode = distance_evidence / distance_evidence.sum(-1, keepdim=True)
-        max_mode, mode_hard = mode.max(dim=-1)
-
-        fo_neg_entropy = categorical_entropy_reg(soft, 1, reduction="none")
-        fo_neg_entropy_mode = categorical_entropy_reg(soft, 1, reduction="none")
-        so_neg_entropy = entropy_reg(
-            alpha, 1, approximate=True, reduction="none"
-        )
+        if self.training:
+            fo_neg_entropy = None
+            exp_fo_neg_entropy = None
+            so_neg_entropy = None
+            epistemic_entropy_diff = None
+        else:
+            fo_neg_entropy = categorical_entropy_reg(soft, 1, reduction="none")
+            exp_fo_neg_entropy = -expected_categorical_entropy(
+                alpha, num_samples=self.params.entropy_num_samples
+            )
+            epistemic_entropy_diff = fo_neg_entropy - exp_fo_neg_entropy
+            so_neg_entropy = entropy_reg(
+                alpha, 1, approximate=True, reduction="none"
+            )
 
         # ---------------------------------------------------------------------------------
         pred = Prediction(
@@ -66,13 +72,11 @@ class GDK(Model):
             # sample confidence scores
             sample_confidence_total=max_soft,
             sample_confidence_total_entropy=fo_neg_entropy,
-            sample_confidence_aleatoric=max_mode,
-            sample_confidence_aleatoric_entropy=fo_neg_entropy_mode,
+            sample_confidence_aleatoric=max_soft,
+            sample_confidence_aleatoric_entropy=exp_fo_neg_entropy,
             sample_confidence_epistemic=alpha.sum(-1),
             sample_confidence_epistemic_entropy=so_neg_entropy,
-            sample_confidence_epistemic_diff=max_soft - max_mode,
-            sample_confidence_epistemic_entropy_diff=fo_neg_entropy
-            - fo_neg_entropy_mode,
+            sample_confidence_epistemic_entropy_diff=epistemic_entropy_diff,
             sample_confidence_features=None,
             sample_confidence_structure=distance_evidence.sum(-1),
         )

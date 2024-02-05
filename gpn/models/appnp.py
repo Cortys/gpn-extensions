@@ -68,6 +68,7 @@ class APPNP(Model):
             sample_confidence_aleatoric_entropy=neg_entropy,
             sample_confidence_epistemic=None,
             sample_confidence_epistemic_entropy=None,
+            sample_confidence_epistemic_entropy_diff=None,
             sample_confidence_features=None,
             sample_confidence_structure=None,
         )

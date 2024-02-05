@@ -62,29 +62,39 @@ class TransductiveExperiment:
             "ce",
             "avg_prediction_confidence_aleatoric",
             "avg_prediction_confidence_epistemic",
+            "avg_sample_confidence_total",
+            "avg_sample_confidence_total_entropy",
             "avg_sample_confidence_aleatoric",
             "avg_sample_confidence_aleatoric_entropy",
             "avg_sample_confidence_epistemic",
             "avg_sample_confidence_epistemic_entropy",
+            "avg_sample_confidence_epistemic_entropy_diff",
             "avg_sample_confidence_features",
             "avg_sample_confidence_neighborhood",
             "average_entropy",
             "accuracy_rejection_prediction_confidence_aleatoric",
             "accuracy_rejection_prediction_confidence_epistemic",
+            "accuracy_rejection_sample_confidence_total",
+            "accuracy_rejection_sample_confidence_total_entropy",
             "accuracy_rejection_sample_confidence_aleatoric",
             "accuracy_rejection_sample_confidence_aleatoric_entropy",
             "accuracy_rejection_sample_confidence_epistemic",
             "accuracy_rejection_sample_confidence_epistemic_entropy",
+            "accuracy_rejection_sample_confidence_epistemic_entropy_diff",
         ]
 
         if self.run_cfg.reduced_training_metrics:
             self.train_metrics = ["accuracy", "ce"]
         else:
             # Leave out accuracy rejections curves for training
-            self.train_metrics = self.metrics[:-6]
+            self.train_metrics = self.metrics[:-9]
 
         self.ood_metrics = [
             # metrics for ood detection (id vs ood)
+            "ood_detection_total_apr",
+            "ood_detection_total_auroc",
+            "ood_detection_total_entropy_apr",
+            "ood_detection_total_entropy_auroc",
             "ood_detection_aleatoric_apr",
             "ood_detection_aleatoric_auroc",
             "ood_detection_aleatoric_entropy_apr",
@@ -93,31 +103,39 @@ class TransductiveExperiment:
             "ood_detection_epistemic_auroc",
             "ood_detection_epistemic_entropy_apr",
             "ood_detection_epistemic_entropy_auroc",
+            "ood_detection_epistemic_entropy_diff_apr",
+            "ood_detection_epistemic_entropy_diff_auroc",
             "ood_detection_features_apr",
             "ood_detection_features_auroc",
             "ood_detection_neighborhood_apr",
             "ood_detection_neighborhood_auroc",
             "ood_detection_structure_apr",
             "ood_detection_structure_auroc",
-            # id metrics
+            # ood metrics
             "ood_accuracy",
             "ood_avg_prediction_confidence_aleatoric",
             "ood_avg_prediction_confidence_epistemic",
+            "ood_avg_sample_confidence_total",
+            "ood_avg_sample_confidence_total_entropy",
             "ood_avg_sample_confidence_aleatoric",
             "ood_avg_sample_confidence_aleatoric_entropy",
             "ood_avg_sample_confidence_epistemic",
             "ood_avg_sample_confidence_epistemic_entropy",
+            "ood_avg_sample_confidence_epistemic_entropy_diff",
             "ood_avg_sample_confidence_neighborhood",
             "ood_avg_sample_confidence_features",
             "ood_average_entropy",
-            # ood metrics
+            # id metrics
             "id_accuracy",
             "id_avg_prediction_confidence_aleatoric",
             "id_avg_prediction_confidence_epistemic",
+            "id_avg_sample_confidence_total",
+            "id_avg_sample_confidence_total_entropy",
             "id_avg_sample_confidence_aleatoric",
             "id_avg_sample_confidence_aleatoric_entropy",
             "id_avg_sample_confidence_epistemic",
             "id_avg_sample_confidence_epistemic_entropy",
+            "id_avg_sample_confidence_epistemic_entropy_diff",
             "id_avg_sample_confidence_features",
             "id_average_entropy",
         ]
@@ -464,6 +482,8 @@ class TransductiveExperiment:
             results = self.evaluate_ood()
         else:
             if self.run_cfg.job == "predict":
+                assert self.model is not None
+                self.model.eval()
                 results = self.predict()
             else:
                 results = self.evaluate()

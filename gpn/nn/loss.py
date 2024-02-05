@@ -112,6 +112,25 @@ def entropy_reg(
     return -beta_reg * reg
 
 
+def expected_categorical_entropy(
+    alpha: torch.Tensor, num_samples: int | None = None
+):
+    """estimates expected entropy of samples from a dirichlet distribution
+
+    Args:
+        alpha (torch.Tensor): dirichlet-alpha scores
+        beta_reg (float): regularization factor
+        reduction (str, optional): loss reduction. Defaults to "sum".
+    """
+    if num_samples is None:
+        num_samples = 1000
+
+    dirichlet = D.Dirichlet(alpha)
+    samples = dirichlet.sample((num_samples,)) # type: ignore
+    entropies = D.Categorical(samples).entropy()
+    return entropies.mean(dim=0)
+
+
 def categorical_entropy_reg(
     probs: torch.Tensor | SparseTensor, beta_reg: float, reduction: str = "sum"
 ) -> torch.Tensor:

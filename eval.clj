@@ -72,6 +72,7 @@
    {:run.log "True"}
    {::model "gpn_lop" ::dataset "ogbn-arxiv"}
    {:model.sparse_x_prune_threshold 0.01
+    :model.entropy_num_samples 100
     :run.num_inits 2}
    {::model "gdk" ::dataset "ogbn-arxiv"}
    {:model.gdk_cutoff 2}

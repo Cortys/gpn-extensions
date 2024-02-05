@@ -9,7 +9,7 @@ import torch_geometric.utils as tu
 from torch_geometric.data import Data
 from torch_sparse import SparseTensor
 from gpn.layers.appnp_propagation import APPNPPropagation
-from gpn.nn import mixture_uce_loss, entropy_reg, categorical_entropy_reg
+from gpn.nn import mixture_uce_loss, entropy_reg, categorical_entropy_reg, expected_categorical_entropy
 from gpn.utils import apply_mask
 from gpn.utils import Prediction
 from .gpn_base import GPN
@@ -64,28 +64,39 @@ class GPN_LOP(GPN):
         soft = propagation_weights @ soft_ft
         log_soft = soft.log()
         max_soft, hard = soft.max(dim=-1)
-        fo_neg_entropy = categorical_entropy_reg(soft, 1, reduction="none")
 
-        mode_ft = beta_ft / beta_ft.sum(-1, keepdim=True)
-        # Compute the log-density of each feature-based Dirichlet mode.
-        # Since we only care about the max, we can ignore normalizing constants:
-        mode_log_density_ft = (
-            (beta_ft * log_beta_ft).sum(-1) - evidence_ft * evidence_ft.log()
-        )
-        mode_log_densities = propagation_weights * mode_log_density_ft.view(1, -1)
-        # Compute the index of the neighbor with the highest mode density for each vertex, i.e., max_mode_densities_idx = argmax(mode_log_densities, dim=-1):
-        neg_max_mode_log_densities = -mode_log_densities.max(dim=-1)
-        mode_log_densities_diff = mode_log_densities + neg_max_mode_log_densities.view(-1, 1)
-        masked_mode_densities = mode_log_densities.masked_select_nnz(mode_log_densities_diff.storage.value() == 0, "coo").storage
-        max_mode_densities_idx = torch.arange(N, device=data.x.device)
-        max_mode_densities_idx[masked_mode_densities.row()] = masked_mode_densities.col()
+        epistemic_entropy_diff: None | torch.Tensor
 
-        mode = mode_ft[max_mode_densities_idx]
-        log_mode = mode.log()
-        max_mode, mode_hard = mode.max(dim=-1)
+        if self.training:
+            fo_neg_entropy = None
+            exp_fo_neg_entropy = None
+            epistemic_entropy_diff = None
+        else:
+            fo_neg_entropy = categorical_entropy_reg(soft, 1, reduction="none")
+            if self.params.entropy_num_samples == 1:
+                mode_ft = beta_ft / beta_ft.sum(-1, keepdim=True)
+                # Compute the log-density of each feature-based Dirichlet mode.
+                # Since we only care about the max, we can ignore normalizing constants:
+                mode_log_density_ft = (
+                    (beta_ft * log_beta_ft).sum(-1) - evidence_ft * evidence_ft.log()
+                )
+                mode_log_densities = propagation_weights * mode_log_density_ft.view(1, -1)
+                # Compute the index of the neighbor with the highest mode density for each vertex, i.e., max_mode_densities_idx = argmax(mode_log_densities, dim=-1):
+                neg_max_mode_log_densities = -mode_log_densities.max(dim=-1)
+                mode_log_densities_diff = mode_log_densities + neg_max_mode_log_densities.view(-1, 1)
+                masked_mode_densities = mode_log_densities.masked_select_nnz(mode_log_densities_diff.storage.value() == 0, "coo").storage
+                max_mode_densities_idx = torch.arange(N, device=data.x.device)
+                max_mode_densities_idx[masked_mode_densities.row()] = masked_mode_densities.col()
 
-        fo_neg_entropy_mode_ft = categorical_entropy_reg(mode_ft, 1, reduction="none")
-        fo_neg_entropy_mode = fo_neg_entropy_mode_ft[max_mode_densities_idx]
+                fo_neg_entropy_mode_ft = categorical_entropy_reg(mode_ft, 1, reduction="none")
+                exp_fo_neg_entropy = fo_neg_entropy_mode_ft[max_mode_densities_idx]
+            else:
+                exp_fo_neg_entropy_ft = -expected_categorical_entropy(
+                    alpha_features, num_samples=self.params.entropy_num_samples
+                )
+                exp_fo_neg_entropy = (propagation_weights @ exp_fo_neg_entropy_ft.view(-1, 1)).view(-1)
+
+            epistemic_entropy_diff = fo_neg_entropy - exp_fo_neg_entropy
 
         neg_entropy_features = entropy_reg(
             alpha_features, 1, approximate=True, reduction="none"
@@ -104,9 +115,6 @@ class GPN_LOP(GPN):
             soft=soft,
             log_soft=log_soft,
             hard=hard,
-            mode_soft=mode,
-            log_mode_soft=log_mode,
-            mode_hard=mode_hard,
             logits=None,
             latent=z,
             latent_features=z,
@@ -122,13 +130,11 @@ class GPN_LOP(GPN):
             # sample confidence scores
             sample_confidence_total=max_soft,
             sample_confidence_total_entropy=fo_neg_entropy,
-            sample_confidence_aleatoric=max_mode,
-            sample_confidence_aleatoric_entropy=fo_neg_entropy_mode,
+            sample_confidence_aleatoric=max_soft,
+            sample_confidence_aleatoric_entropy=exp_fo_neg_entropy,
             sample_confidence_epistemic=alpha.sum(-1),
             sample_confidence_epistemic_entropy=so_neg_entropy,
-            sample_confidence_epistemic_diff=max_soft - max_mode,
-            sample_confidence_epistemic_entropy_diff=fo_neg_entropy
-            - fo_neg_entropy_mode,
+            sample_confidence_epistemic_entropy_diff=epistemic_entropy_diff,
             sample_confidence_features=alpha_features.sum(-1),
             sample_confidence_structure=None,
         )

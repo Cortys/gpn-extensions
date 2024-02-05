@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
 import torch_geometric.utils as tu
-from gpn.nn import uce_loss, entropy_reg, categorical_entropy_reg
+from gpn.nn import entropy_reg, categorical_entropy_reg, expected_categorical_entropy
 from gpn.layers import APPNPPropagation, propagation_wrapper
 from gpn.utils import apply_mask
 from gpn.utils import Prediction
@@ -51,6 +51,9 @@ class GPN_MLP(GPN):
         max_soft, hard = soft.max(dim=-1)
 
         fo_neg_entropy = categorical_entropy_reg(soft, 1, reduction="none")
+        exp_fo_neg_entropy = -expected_categorical_entropy(
+            alpha, num_samples=self.params.entropy_num_samples
+        )
         so_neg_entropy = entropy_reg(
             alpha_features, 1, approximate=True, reduction="none"
         )
@@ -75,10 +78,13 @@ class GPN_MLP(GPN):
             prediction_confidence_epistemic=alpha[torch.arange(hard.size(0)), hard],
             prediction_confidence_structure=None,
             # sample confidence scores
+            sample_confidence_total=max_soft,
+            sample_confidence_total_entropy=fo_neg_entropy,
             sample_confidence_aleatoric=max_soft,
-            sample_confidence_aleatoric_entropy=fo_neg_entropy,
+            sample_confidence_aleatoric_entropy=exp_fo_neg_entropy,
             sample_confidence_epistemic=alpha.sum(-1),
             sample_confidence_epistemic_entropy=so_neg_entropy,
+            sample_confidence_epistemic_entropy_diff=fo_neg_entropy - exp_fo_neg_entropy,
             sample_confidence_features=alpha_features.sum(-1),
             sample_confidence_structure=None,
         )

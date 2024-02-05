@@ -151,6 +151,7 @@ class ModelConfiguration(HalfFrozenObject):
     dropout_prob_adj: float = attr.ib(default=0.0)
     # mainly relevant for ogbn-arxiv
     batch_norm: bool = attr.ib(default=None)
+    entropy_num_samples: int | None = attr.ib(default=None)
 
     # for constrained linear layers
     k_lipschitz: float = attr.ib(default=None)
@@ -259,7 +260,8 @@ class ModelConfiguration(HalfFrozenObject):
             "num_samples_dropout",
             "init_no",
             "dim_features",
-            "num_classes"
+            "num_classes",
+            "entropy_num_samples",
         ]
 
         return ignore

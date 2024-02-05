@@ -13,12 +13,9 @@ class Prediction(HalfFrozenObject):
     # softmax prediction
     soft: torch.Tensor = attr.ib(default=None)
     log_soft: torch.Tensor = attr.ib(default=None)
-    mode_soft: torch.Tensor = attr.ib(default=None)
-    log_mode_soft: torch.Tensor = attr.ib(default=None)
 
     # class prediction
     hard: torch.Tensor = attr.ib(default=None)
-    mode_hard: torch.Tensor = attr.ib(default=None)
 
     # alpha prediction
     alpha: torch.Tensor = attr.ib(default=None)
@@ -75,17 +72,16 @@ class Prediction(HalfFrozenObject):
     prediction_confidence_structure: torch.Tensor | None = attr.ib(default=None)
 
     # scores for sample confidence
-    sample_confidence_total: torch.Tensor = attr.ib(default=None)
-    sample_confidence_total_entropy: torch.Tensor = attr.ib(default=None)
-    sample_confidence_aleatoric: torch.Tensor = attr.ib(default=None)
-    sample_confidence_aleatoric_entropy: torch.Tensor = attr.ib(default=None)
+    sample_confidence_total: torch.Tensor | None = attr.ib(default=None)
+    sample_confidence_total_entropy: torch.Tensor | None = attr.ib(default=None)
+    sample_confidence_aleatoric: torch.Tensor | None = attr.ib(default=None)
+    sample_confidence_aleatoric_entropy: torch.Tensor | None = attr.ib(default=None)
     sample_confidence_epistemic: torch.Tensor | None = attr.ib(default=None)
     sample_confidence_epistemic_entropy: torch.Tensor | None = attr.ib(default=None)
-    sample_confidence_epistemic_diff: torch.Tensor | None = attr.ib(default=None)
     sample_confidence_epistemic_entropy_diff: torch.Tensor | None = attr.ib(default=None)
     sample_confidence_structure: torch.Tensor | None = attr.ib(default=None)
     sample_confidence_features: torch.Tensor | None = attr.ib(default=None)
-    sample_confidence_neighborhood: torch.Tensor = attr.ib(default=None)
+    sample_confidence_neighborhood: torch.Tensor | None = attr.ib(default=None)
 
     # RGCN
     mu_1: torch.Tensor = attr.ib(default=None)
