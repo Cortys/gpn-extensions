@@ -405,10 +405,19 @@
          (dec (/ (- ood-certainty) (Math/abs norm))))))))
 
 (defn round
-  [n places]
-  (when n
-    (let [factor (Math/pow 10 places)]
-      (/ (Math/round (* n factor)) factor))))
+  ([n places]
+   (round n places 1))
+  ([n places factor & {:keys [sign] :or {sign false}}]
+   (when n
+     (let [scale (Math/pow 10 (dec places))
+           num (/ (Math/round (* n scale factor)) scale)
+           res (format (str "%." places "f") num)
+           l (inc places)
+           l (if (pos? num) l (inc l))
+           res (subs res 0 l)]
+       (if (and sign (pos? num))
+         (str "+" res)
+         res)))))
 
 (defn run-id-ood-table-gen!
   [& _]
@@ -448,7 +457,7 @@
               (fn [i [dataset model]]
                 (let [class-results (-> (try-get-results dataset model "classification" {}
                                                          :only-cached true)
-                                                 :test)
+                                        :test)
                       row [i
                            (-> dataset datasets (::inline-name dataset))
                            (-> model models (::inline-name model))
@@ -464,29 +473,30 @@
                                                   aleatoric-entropy-change (compute-certainty-change results "aleatoric_entropy")
                                                   epistemic-entropy-change (compute-certainty-change results "epistemic_entropy")
                                                   epistemic-entropy-diff-change (compute-certainty-change results "epistemic_entropy_diff")]
-                                              (map #(round % 4)
-                                                   [(:id_accuracy results) (:id_accuracy_se results 0)
-                                                    (:ood_accuracy results) (:ood_accuracy_se results 0)
-                                                    (:ood_detection_total_auroc results)
-                                                    (:ood_detection_total_auroc_se results 0)
-                                                    (:ood_detection_total_entropy_auroc results)
-                                                    (:ood_detection_total_entropy_auroc_se results 0)
-                                                    (:ood_detection_aleatoric_auroc results)
-                                                    (:ood_detection_aleatoric_auroc_se results 0)
-                                                    (:ood_detection_aleatoric_entropy_auroc results)
-                                                    (:ood_detection_aleatoric_entropy_auroc_se results 0)
-                                                    (:ood_detection_epistemic_auroc results)
-                                                    (:ood_detection_epistemic_auroc_se results 0)
-                                                    (:ood_detection_epistemic_entropy_auroc results)
-                                                    (:ood_detection_epistemic_entropy_auroc_se results 0)
-                                                    (:ood_detection_epistemic_entropy_diff_auroc results)
-                                                    (:ood_detection_epistemic_entropy_diff_auroc_se results 0)
-                                                    total-entropy-change
-                                                    aleatoric-entropy-change
-                                                    epistemic-entropy-change
-                                                    epistemic-entropy-diff-change]))))
+                                              (concat (map #(round % 4 100)
+                                                           [(:id_accuracy results) (:id_accuracy_se results 0)
+                                                            (:ood_accuracy results) (:ood_accuracy_se results 0)
+                                                            (:ood_detection_total_auroc results)
+                                                            (:ood_detection_total_auroc_se results 0)
+                                                            (:ood_detection_total_entropy_auroc results)
+                                                            (:ood_detection_total_entropy_auroc_se results 0)
+                                                            (:ood_detection_aleatoric_auroc results)
+                                                            (:ood_detection_aleatoric_auroc_se results 0)
+                                                            (:ood_detection_aleatoric_entropy_auroc results)
+                                                            (:ood_detection_aleatoric_entropy_auroc_se results 0)
+                                                            (:ood_detection_epistemic_auroc results)
+                                                            (:ood_detection_epistemic_auroc_se results 0)
+                                                            (:ood_detection_epistemic_entropy_auroc results)
+                                                            (:ood_detection_epistemic_entropy_auroc_se results 0)
+                                                            (:ood_detection_epistemic_entropy_diff_auroc results)
+                                                            (:ood_detection_epistemic_entropy_diff_auroc_se results 0)])
+                                                      (map #(round % 4 100 :sign true)
+                                                           [total-entropy-change
+                                                            aleatoric-entropy-change
+                                                            epistemic-entropy-change
+                                                            epistemic-entropy-diff-change])))))
                                   setting-names))))
-              rows)
+                rows)
         csv (str/join "\n" (cons head body))]
     (log/info (str "Creating table with " (count cols) " columns..."))
     (spit "tables/id_ood.csv" csv))
