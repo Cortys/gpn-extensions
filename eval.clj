@@ -44,10 +44,10 @@
                  ::inline-name "Matern-GGP"
                  :run.num_inits 1}
    "gdk" {::name "gdk" ::inline-name "GKDE"}
-   "gpn" {::name "gpn_16" ::inline-name "GPN"}
+   "gpn" {::name "gpn_16" ::inline-name "GPN (sym)"}
    "gpn_rw" {::name "gpn_16"
              ::colname "gpnRW"
-             ::inline-name "GPN (RW)"
+             ::inline-name "GPN (rw)"
              :model.adj_normalization "rw"}
    "gpn_lop" {::name "gpn_16"
               ::inline-name "LOP-GPN"
