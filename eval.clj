@@ -49,6 +49,10 @@
              ::colname "gpnRW"
              ::inline-name "GPN (rw)"
              :model.adj_normalization "rw"}
+   "gpn_sum" {::name "gpn_16"
+              ::colanme "gpnSum"
+              ::inline-name "GPN (sum)"
+              :model.adj_normalization "sum"}
    "gpn_lop" {::name "gpn_16"
               ::inline-name "LOP-GPN"
               ::colname "gpnLOP"

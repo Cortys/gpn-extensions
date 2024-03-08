@@ -44,6 +44,7 @@ class APPNPPropagation(MessagePassing):
             "out-degree",
             "in-degree-sym",
             "sym-var",
+            "sum",
             None,
         )
         self.normalization = normalization

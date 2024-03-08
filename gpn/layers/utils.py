@@ -144,6 +144,15 @@ def mat_norm(
             dtype=dtype,
         )
 
+    if normalization == "sum":
+        return self_loop_norm(
+            edge_index,
+            edge_weight=edge_weight,
+            num_nodes=num_nodes,
+            add_self_loops=add_self_loops,
+            dtype=dtype,
+        )
+
     raise AssertionError
 
 
@@ -327,7 +336,7 @@ def inv_norm(
         edge_weight (Optional[Tensor], optional): optional tensor of edge weights. Defaults to None.
         num_nodes (Optional[int], optional): number of nodes. Defaults to None.
         add_self_loops (bool, optional): flag to add self-loops to edges. Defaults to True.
-        dtype (Optional[Any], optional): dtype . Defaults to None.
+        dtype (Optional[Any], optional): dtype. Defaults to None.
 
     Returns:
         Adj: normalized adjacency matrix
@@ -375,6 +384,52 @@ def inv_norm(
     in_deg_inv.masked_fill_(in_deg_inv == float("inf"), 0)
     # A = D_in^-1 * A * D_out^-1
     edge_weight = in_deg_inv[col] * edge_weight * in_deg_inv[row]
+
+    return edge_index, edge_weight
+
+
+def self_loop_norm(
+    edge_index: Adj,
+    edge_weight: Optional[Tensor] = None,
+    num_nodes: Optional[int] = None,
+    add_self_loops: bool = True,
+    dtype: Optional[Any] = None,
+) -> Adj | Tuple[Tensor, Tensor]:
+    """Adds self-loops to adjacency matrix
+
+    Args:
+        edge_index (Adj): representation of edges in graph
+        edge_weight (Optional[Tensor], optional): optional tensor of edge weights. Defaults to None.
+        num_nodes (Optional[int], optional): number of nodes. Defaults to None.
+        add_self_loops (bool, optional): flag to add self-loops to edges. Defaults to True.
+        dtype (Optional[Any], optional): dtype. Defaults to None.
+
+    Returns:
+        Adj: adjacency matrix with self-loops
+    """
+
+    fill_value = 1.0
+    if isinstance(edge_index, SparseTensor):
+        adj_t = edge_index
+        if not adj_t.has_value():
+            adj_t = adj_t.fill_value(1.0, dtype=dtype)
+        if add_self_loops:
+            adj_t = fill_diag(adj_t, fill_value)  # type: ignore
+
+        return adj_t  # type: ignore
+
+    assert isinstance(edge_index, Tensor)
+
+    if edge_weight is None:
+        edge_weight = torch.ones(
+            (edge_index.size(1),), dtype=dtype, device=edge_index.device
+        )
+
+    if add_self_loops:
+        edge_index, edge_weight = tu.add_remaining_self_loops(
+            edge_index, edge_weight, fill_value, num_nodes
+        )
+        assert edge_weight is not None
 
     return edge_index, edge_weight
 
