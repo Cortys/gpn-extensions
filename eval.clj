@@ -31,7 +31,6 @@
                         :run.reduced_training_metrics "True"
                         :training.eval_every 10
                         :training.stopping_patience 5
-                        :model.entropy_num_samples 100
                         :run.log "True"})})
 
 (def models

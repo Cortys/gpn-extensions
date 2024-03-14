@@ -165,6 +165,9 @@ class ModelConfiguration(HalfFrozenObject):
     negative_slope: float = attr.ib(default=None)
     coefficient_dropout_prob: float = attr.ib(default=None)
 
+    # CUQ-GNN
+    convolution_name: str = attr.ib(default=None)
+
     # diffusion
     K: int = attr.ib(default=None)
     alpha_teleport: float = attr.ib(default=None)
