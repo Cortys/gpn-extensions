@@ -51,9 +51,7 @@ class GPN_MLP(GPN):
         max_soft, hard = soft.max(dim=-1)
 
         fo_neg_entropy = categorical_entropy_reg(soft, 1, reduction="none")
-        exp_fo_neg_entropy = -expected_categorical_entropy(
-            alpha, num_samples=self.params.entropy_num_samples
-        )
+        exp_fo_neg_entropy = -expected_categorical_entropy(alpha)
         so_neg_entropy = entropy_reg(
             alpha_features, 1, approximate=True, reduction="none"
         )

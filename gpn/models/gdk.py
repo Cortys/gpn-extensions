@@ -49,9 +49,7 @@ class GDK(Model):
             epistemic_entropy_diff = None
         else:
             fo_neg_entropy = categorical_entropy_reg(soft, 1, reduction="none")
-            exp_fo_neg_entropy = -expected_categorical_entropy(
-                alpha, num_samples=self.params.entropy_num_samples
-            )
+            exp_fo_neg_entropy = -expected_categorical_entropy(alpha)
             epistemic_entropy_diff = fo_neg_entropy - exp_fo_neg_entropy
             so_neg_entropy = entropy_reg(
                 alpha, 1, approximate=True, reduction="none"
