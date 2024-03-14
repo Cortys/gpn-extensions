@@ -25,30 +25,9 @@ class GPN(Model):
     def __init__(self, params: ModelConfiguration):
         super().__init__(params)
 
-        if self.params.num_layers is None:
-            num_layers = 0
-
-        else:
-            num_layers = self.params.num_layers
+        self.init_input_encoder()
 
         assert isinstance(self.params.dim_hidden, int)
-
-        if num_layers > 2:
-            self.input_encoder = LinearSequentialLayer(
-                self.params.dim_features,
-                [self.params.dim_hidden] * (num_layers - 2),
-                self.params.dim_hidden,
-                batch_norm=self.params.batch_norm,
-                dropout_prob=self.params.dropout_prob,
-                activation_in_all_layers=True,
-            )
-        else:
-            self.input_encoder = nn.Sequential(
-                nn.Linear(self.params.dim_features, self.params.dim_hidden),
-                nn.ReLU(),
-                nn.Dropout(p=self.params.dropout_prob),
-            )
-
         self.latent_encoder = nn.Linear(self.params.dim_hidden, self.params.dim_latent)
 
         use_batched = True if self.params.use_batched_flow else False
@@ -73,6 +52,31 @@ class GPN(Model):
             "nll_consistency",
             None,
         )
+
+    def init_input_encoder(self):
+        assert isinstance(self.params.dim_hidden, int)
+
+        if self.params.num_layers is None:
+            num_layers = 0
+
+        else:
+            num_layers = self.params.num_layers
+
+        if num_layers > 2:
+            self.input_encoder = LinearSequentialLayer(
+                self.params.dim_features,
+                [self.params.dim_hidden] * (num_layers - 2),
+                self.params.dim_hidden,
+                batch_norm=self.params.batch_norm,
+                dropout_prob=self.params.dropout_prob,
+                activation_in_all_layers=True,
+            )
+        else:
+            self.input_encoder = nn.Sequential(
+                nn.Linear(self.params.dim_features, self.params.dim_hidden),
+                nn.ReLU(),
+                nn.Dropout(p=self.params.dropout_prob),
+            )
 
     def init_propagation(self):
         normalization = self.params.adj_normalization
@@ -133,12 +137,10 @@ class GPN(Model):
             epistemic_entropy_diff = None
         else:
             fo_neg_entropy = categorical_entropy_reg(soft, 1, reduction="none")
-            exp_fo_neg_entropy = -expected_categorical_entropy(
-                alpha, num_samples=self.params.entropy_num_samples
-            )
+            exp_fo_neg_entropy = -expected_categorical_entropy(alpha)
             epistemic_entropy_diff = fo_neg_entropy - exp_fo_neg_entropy
         so_neg_entropy = entropy_reg(
-            alpha_features, 1, approximate=True, reduction="none"
+            alpha, 1, approximate=True, reduction="none"
         )
 
         # ---------------------------------------------------------------------------------

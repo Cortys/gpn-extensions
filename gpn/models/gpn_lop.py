@@ -73,28 +73,8 @@ class GPN_LOP(GPN):
             epistemic_entropy_diff = None
         else:
             fo_neg_entropy = categorical_entropy_reg(soft, 1, reduction="none")
-            if self.params.entropy_num_samples == 1:
-                mode_ft = beta_ft / beta_ft.sum(-1, keepdim=True)
-                # Compute the log-density of each feature-based Dirichlet mode.
-                # Since we only care about the max, we can ignore normalizing constants:
-                mode_log_density_ft = (
-                    (beta_ft * log_beta_ft).sum(-1) - evidence_ft * evidence_ft.log()
-                )
-                mode_log_densities = propagation_weights * mode_log_density_ft.view(1, -1)
-                # Compute the index of the neighbor with the highest mode density for each vertex, i.e., max_mode_densities_idx = argmax(mode_log_densities, dim=-1):
-                neg_max_mode_log_densities = -mode_log_densities.max(dim=-1)
-                mode_log_densities_diff = mode_log_densities + neg_max_mode_log_densities.view(-1, 1)
-                masked_mode_densities = mode_log_densities.masked_select_nnz(mode_log_densities_diff.storage.value() == 0, "coo").storage
-                max_mode_densities_idx = torch.arange(N, device=data.x.device)
-                max_mode_densities_idx[masked_mode_densities.row()] = masked_mode_densities.col()
-
-                fo_neg_entropy_mode_ft = categorical_entropy_reg(mode_ft, 1, reduction="none")
-                exp_fo_neg_entropy = fo_neg_entropy_mode_ft[max_mode_densities_idx]
-            else:
-                exp_fo_neg_entropy_ft = -expected_categorical_entropy(
-                    alpha_features, num_samples=self.params.entropy_num_samples
-                )
-                exp_fo_neg_entropy = (propagation_weights @ exp_fo_neg_entropy_ft.view(-1, 1)).view(-1)
+            exp_fo_neg_entropy_ft = -expected_categorical_entropy(alpha_features)
+            exp_fo_neg_entropy = (propagation_weights @ exp_fo_neg_entropy_ft.view(-1, 1)).view(-1)
 
             epistemic_entropy_diff = fo_neg_entropy - exp_fo_neg_entropy
 
