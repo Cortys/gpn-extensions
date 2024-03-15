@@ -17,6 +17,7 @@ from .gpn_log_beta import GPN_LOG_BETA
 from .gpn_postnet_diff import GPN_MLP
 from .gpn_postnet import PostNet
 from .gpn_lop import GPN_LOP
+from .cuq_gnn import CUQ_GNN
 from .matern_ggp import MaternGGP
 from .ggp import GGP
 from .gpflow_gpp import GPFLOWGGP

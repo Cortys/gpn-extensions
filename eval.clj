@@ -49,14 +49,28 @@
              ::inline-name "GPN (rw)"
              :model.adj_normalization "rw"}
    "gpn_sum" {::name "gpn_16"
-              ::colanme "gpnSum"
+              ::colname "gpnSum"
               ::inline-name "GPN (sum)"
               :model.adj_normalization "sum"}
    "gpn_lop" {::name "gpn_16"
               ::inline-name "LOP-GPN"
               ::colname "gpnLOP"
               :model.model_name "GPN_LOP"
-              :model.sparse_x_prune_threshold 0.01}})
+              :model.sparse_x_prune_threshold 0.01}
+   "cuq_gcn" {::name "gpn_16"
+              ::colname "cuqGCN"
+              ::inline-name "CUQ-GCN"
+              :model.model_name "CUQ_GNN"
+              :model.convolution_name "gcn"}
+   "cuq_gat" {::name "gpn_16"
+              ::colname "cuqGAT"
+              ::inline-name "CUQ-GAT"
+              :model.model_name "CUQ_GNN"
+              :model.convolution_name "gat"
+              :model.heads_conv1 1
+              :model.heads_conv2 1
+              :model.negative_slope 0.2
+              :model.coefficient_dropout_prob 0}})
 
 (def settings
   {"classification" {}
@@ -81,7 +95,13 @@
    {::model "gdk" ::dataset "ogbn-arxiv"}
    {:model.gdk_cutoff 2}
    {::model "matern_ggp" ::dataset "ogbn-arxiv"}
-   {::skip true}})
+   {::skip true}
+   ;; {::model "cuq_gcn"}
+   ;; {:run.num_inits 2}
+   ;; {::model "cuq_gat"}
+   ;; {:run.num_inits 2}
+   {::model "cuq_gat" ::dataset "ogbn-arxiv"}
+   {:run.num_inits 2}})
 
 (def default-datasets ["CoraML"
                        "CiteSeerFull"
@@ -94,7 +114,9 @@
                      "gdk"
                      "gpn"
                      "gpn_rw"
-                     "gpn_lop"])
+                     "gpn_lop"
+                     #_"cuq_gcn"
+                     "cuq_gat"])
 (def default-settings ["classification"
                        "ood_loc"
                        "ood_features_normal"

@@ -16,9 +16,6 @@ class CUQ_GNN(GPN):
     def __init__(self, params: ModelConfiguration):
         super().__init__(params)
 
-    def init_input_encoder(self):
-        pass
-
     def init_propagation(self):
         assert self.params.convolution_name in (
             "gcn",
@@ -27,6 +24,7 @@ class CUQ_GNN(GPN):
         assert isinstance(self.params.dim_hidden, int)
         params = self.params.clone()
         params.set_values(
+            dim_features=self.params.dim_hidden,
             num_classes=self.params.dim_hidden,
         )
         if self.params.convolution_name == "gcn":
@@ -35,7 +33,10 @@ class CUQ_GNN(GPN):
             self.gnn = GAT(params)
 
     def forward_impl(self, data: Data) -> Prediction:
-        h = self.gnn(data)
+        h = self.input_encoder(data.x)
+        new_data = data.clone()
+        new_data["x"] = h
+        h = self.gnn.forward_impl(new_data)
         z = self.latent_encoder(h)
 
         # compute feature evidence (with Normalizing Flows)

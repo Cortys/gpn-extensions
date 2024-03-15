@@ -119,8 +119,6 @@ def expected_categorical_entropy(
 
     Args:
         alpha (torch.Tensor): dirichlet-alpha scores
-        beta_reg (float): regularization factor
-        reduction (str, optional): loss reduction. Defaults to "sum".
     """
     alpha_sum = alpha.sum(-1, keepdim=True)
     mu = alpha / alpha_sum
