@@ -65,6 +65,9 @@ class MultipleRunExperiment:
 
                 run_results.append(results)
 
+        if self.run_cfg.delete_run:
+            return
+
         if self.run_cfg.job == "predict":
             return [p for ps in run_results for p in ps]
 
@@ -94,6 +97,8 @@ class MultipleRunExperiment:
             ex=self.ex,
             dataset=self._cached_dataset,
         )
+        if self.run_cfg.delete_run:
+            return {}
         self._cached_dataset = experiment.dataset
         results = experiment.run()
 

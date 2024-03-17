@@ -100,8 +100,9 @@
    ;; {:run.num_inits 2}
    ;; {::model "cuq_gat"}
    ;; {:run.num_inits 2}
-   {::model "cuq_gat" ::dataset "ogbn-arxiv"}
-   {:run.num_inits 2}})
+   ;; {::model "cuq_gat" ::dataset "ogbn-arxiv"}
+   ;; {:run.num_inits 10}
+   })
 
 (def default-datasets ["CoraML"
                        "CiteSeerFull"
@@ -115,7 +116,7 @@
                      "gpn"
                      "gpn_rw"
                      "gpn_lop"
-                     #_"cuq_gcn"
+                     "cuq_gcn"
                      "cuq_gat"])
 (def default-settings ["classification"
                        "ood_loc"
@@ -208,10 +209,12 @@
 
 (defn get-results
   [dataset-name model-name setting-name overrides
-   & {:keys [only-cached no-cache]
-      :or {only-cached false no-cache false}}]
+   & {:keys [only-cached no-cache delete]
+      :or {only-cached false no-cache false delete false}}]
   (assert (not (and only-cached no-cache))
           "only-cached and no-cache cannot be enabled at the same time.")
+  (assert (not (and only-cached delete))
+          "only-cached and delete cannot be enabled at the same time.")
   (let [combination-id (stringify-combination dataset-name
                                               model-name
                                               setting-name)
@@ -229,7 +232,7 @@
                        :overrides overrides})))
     (if (and (not (:run.retrain overrides))
              (not (:run.reeval overrides))
-             (not no-cache)
+             (not no-cache) (not delete)
              (fs/exists? results-path))
       (log/debug "Loading" combination-id "from cache...")
       (if only-cached
@@ -240,12 +243,14 @@
                          :setting-name setting-name
                          :overrides overrides}))
         (do
-          (log/info "Running" combination-id "...")
+          (log/info (if delete "Deleting" "Running")
+                    combination-id "...")
           (fs/create-dirs (fs/parent results-path))
           (apply run-config! params))))
-    (let [results (json/parse-stream (io/reader results-path) true)
-          results (update-cached-results results (last params))]
-      results)))
+    (when-not delete
+      (let [results (json/parse-stream (io/reader results-path) true)
+            results (update-cached-results results (last params))]
+        results))))
 
 (defn try-get-results
   [& args]
@@ -292,24 +297,43 @@
 
 (defn run-eval!
   [{:keys [dataset model setting override
-           dry retrain reeval only-cached cache]
+           dry retrain reeval only-cached cache delete]
     :or {dataset default-datasets
          model default-models
          setting default-settings}}]
   (let [default-config (cond-> {}
                          retrain (assoc :run.retrain true)
-                         reeval (assoc :run.reeval true))
+                         reeval (assoc :run.reeval true)
+                         delete (assoc :run.delete_run true))
         override (into default-config (map parse-override) override)]
     (print-grid dataset model setting override)
+    (when delete
+      (print "\nAre you sure you want to delete all results listed above? (y/N) ")
+      (flush)
+      (let [input (read-line)]
+        (if (str/starts-with? (str/lower-case input) "y")
+          (do
+            (log/info "Will start deleting all selected results in 3s...")
+            (Thread/sleep 1000)
+            (log/info "Will start deleting all selected results in 2s...")
+            (Thread/sleep 1000)
+            (log/info "Will start deleting all selected results in 1s...")
+            (Thread/sleep 1000)
+            (log/info "Deleting..."))
+          (do
+            (log/error "Aborted.")
+            (System/exit 1)))))
     (when-not dry
-      (log/info (str "Starting experiments ("
+      (log/info (str (if delete "Deleting" "Starting")
+                     " experiments ("
                      "only-cached=" only-cached ", "
                      "cache=" cache
                      ")..."))
       (Thread/sleep 500)
       (run-combinations! dataset model setting override
                          :only-cached only-cached
-                         :no-cache (not cache)))
+                         :no-cache (not cache)
+                         :delete delete))
     (log/info "Done.")))
 
 ;; Accuracy-rejection tables
@@ -574,6 +598,10 @@
                          {:as "No Cache"
                           :option "cache"
                           :default true
+                          :type :with-flag}
+                         {:as "Delete existing models and results"
+                          :option "delete"
+                          :default false
                           :type :with-flag}]
                   :runs run-eval!}
                  {:command "acc-rej-tables"

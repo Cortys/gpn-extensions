@@ -39,6 +39,7 @@ class RunConfiguration(HalfFrozenObject):
 
     # save-flag (e.g. for not saving GridSearch experiments)
     save_model: bool = attr.ib(default=None)
+    delete_run: bool = attr.ib(default=None)
     retrain: bool = attr.ib(default=None)
     reeval: bool = attr.ib(default=None)
 

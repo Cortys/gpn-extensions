@@ -72,6 +72,13 @@ def run_experiment(run: dict, data: dict, model: dict, training: dict) -> dict |
 
     results = experiment.run()
 
+    if run_cfg.delete_run:
+        if run_cfg.results_path is not None and os.path.exists(run_cfg.results_path):
+            os.remove(run_cfg.results_path)
+
+        print("Deleted individual and aggregated runs.")
+        return
+
     if run_cfg.job == "predict":
         return results
 

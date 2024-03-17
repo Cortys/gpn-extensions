@@ -145,6 +145,9 @@ class TransductiveExperiment:
 
         self.setup_storage()
 
+        if self.run_cfg.delete_run:
+            return
+
         if dataset is None:
             if self.evaluation_results is None:
                 self.dataset = ExperimentDataset(
@@ -176,6 +179,22 @@ class TransductiveExperiment:
             init_no=self.model_cfg.init_no,
         )
         self.results_file_path = results_file_path
+
+        if self.run_cfg.delete_run:
+            try:
+                model_file_path = storage.retrieve_model_file_path(
+                    self.model_cfg.model_name,
+                    storage_params,
+                    init_no=self.model_cfg.init_no,
+                )
+                print(f"Removing model: {model_file_path}")
+                os.remove(model_file_path)
+            except ModelNotFoundError:
+                pass
+            if os.path.exists(results_file_path):
+                print(f"Removing results: {results_file_path}")
+                os.remove(results_file_path)
+            return
 
         if (
             not self.run_cfg.reeval
@@ -461,6 +480,7 @@ class TransductiveExperiment:
         return history
 
     def run(self) -> Dict[str, Any]:
+        assert not self.run_cfg.delete_run, "Cannot run experiments in delete mode."
         exp_params = ", ".join(
             [
                 f"model={self.model_cfg.model_name}",
@@ -471,6 +491,7 @@ class TransductiveExperiment:
                 f"results={self.results_file_path}",
                 f"trained={self.already_trained()}",
                 f"evaluated={self.evaluation_results is not None}",
+                f"delete={self.run_cfg.delete_run}",
             ]
         )
         print(f"Starting experiment ({exp_params}).")
