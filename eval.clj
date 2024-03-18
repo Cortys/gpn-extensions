@@ -468,84 +468,113 @@
          (str "+" res)
          res)))))
 
+(defn get-se
+  [results metric]
+  (let [se (keyword (str metric "_se"))]
+    (se results 0)))
+
+(defn get-metric
+  [results best-results metric]
+  (let [result (metric results)
+        best-result (best-results metric)]
+    [(round result 4 100)
+     (round (get-se results metric) 4 100)
+     (if (and result best-result (>= result best-result)) "1" "0")]))
+
 (defn run-id-ood-table-gen!
   [& _]
   (log/info "Generating ID-OOD table...")
   (let [dataset-names default-datasets
         model-names default-models
         setting-names (rest default-settings)
-        cols (into ["id" "dataset" "model" "acc" "accSE"]
+        class-metrics [:accuracy]
+        settings-metrics [:id_accuracy
+                          :ood_accuracy
+                          :ood_detection_total_auroc
+                          :ood_detection_total_entropy_auroc
+                          :ood_detection_aleatoric_auroc
+                          :ood_detection_aleatoric_entropy_auroc
+                          :ood_detection_epistemic_auroc
+                          :ood_detection_epistemic_entropy_auroc
+                          :ood_detection_epistemic_entropy_diff_auroc]
+        cols (into ["id" "dataset" "model" "acc" "accSE" "accBest"]
                    (mapcat (fn [setting]
                              (let [setting (-> setting settings ::colname)]
-                               [(str setting "IdAcc")
-                                (str setting "IdAccSE")
-                                (str setting "OodAcc")
-                                (str setting "OodAccSE")
-                                (str setting "OodTotal")
-                                (str setting "OodTotalSE")
-                                (str setting "OodTotalEntropy")
-                                (str setting "OodTotalEntropySE")
-                                (str setting "OodAleatoric")
-                                (str setting "OodAleatoricSE")
-                                (str setting "OodAleatoricEntropy")
-                                (str setting "OodAleatoricEntropySE")
-                                (str setting "OodEpistemic")
-                                (str setting "OodEpistemicSE")
-                                (str setting "OodEpistemicEntropy")
-                                (str setting "OodEpistemicEntropySE")
-                                (str setting "OodEpistemicEntropyDiff")
-                                (str setting "OodEpistemicEntropyDiffSE")
-                                (str setting "TotalEntropyChange")
-                                (str setting "AleatoricEntropyChange")
-                                (str setting "EpistemicEntropyChange")
-                                (str setting "EpistemicEntropyDiffChange")])))
+                               (concat
+                                (mapcat #(do [% (str % "SE") (str % "Best")])
+                                        [(str setting "IdAcc")
+                                         (str setting "OodAcc")
+                                         (str setting "OodTotal")
+                                         (str setting "OodTotalEntropy")
+                                         (str setting "OodAleatoric")
+                                         (str setting "OodAleatoricEntropy")
+                                         (str setting "OodEpistemic")
+                                         (str setting "OodEpistemicEntropy")
+                                         (str setting "OodEpistemicEntropyDiff")])
+                                [(str setting "TotalEntropyChange")
+                                 (str setting "AleatoricEntropyChange")
+                                 (str setting "EpistemicEntropyChange")
+                                 (str setting "EpistemicEntropyDiffChange")]))))
                    setting-names)
         head (str/join "," cols)
-        rows (for [d dataset-names, m model-names] [d m])
+        rows (for [dataset dataset-names
+                   model model-names
+                   :let [class-results
+                         (-> (try-get-results dataset model "classification" {}
+                                              :only-cached true)
+                             :test)
+                         setting-results (zipmap setting-names
+                                                  (map (fn [setting]
+                                                         (-> (try-get-results dataset model setting {}
+                                                                              :only-cached true)
+                                                             :test))
+                                                       setting-names))]]
+               {:dataset dataset
+                :model model
+                :class-results class-results
+                :setting-results setting-results})
+        metrics (concat (map #(do [:class-results %]) class-metrics)
+                        (for [setting setting-names
+                              metric settings-metrics]
+                          [:setting-results setting metric]))
+        row-groups (group-by :dataset rows)
+        best-metric-groups
+        (into {}
+              (mapcat (fn [[group rows]]
+                        (map (fn [metric]
+                               (let [vals (keep #(get-in % metric) rows)
+                                     best-val (apply max ##-Inf vals)]
+                                 [(conj metric group) best-val]))
+                             metrics)))
+              row-groups)
         body (map-indexed
-              (fn [i [dataset model]]
-                (let [class-results (-> (try-get-results dataset model "classification" {}
-                                                         :only-cached true)
-                                        :test)
-                      row [i
+              (fn [i {:keys [dataset model class-results setting-results]}]
+                (let [row [i
                            (-> dataset datasets (::inline-name dataset))
-                           (-> model models (::inline-name model))
-                           (-> class-results :accuracy)
-                           (-> class-results (:accuracy_se 0))]]
+                           (-> model models (::inline-name model))]
+                      class-best-results (fn [metric] (best-metric-groups [:class-results metric dataset]))
+                      row (into row
+                                (mapcat #(get-metric class-results class-best-results %))
+                                class-metrics)]
                   (str/join ","
                             (into row
-                                  (mapcat (fn [setting]
-                                            (let [results (try-get-results dataset model setting {}
-                                                                           :only-cached true)
-                                                  results (:test results)
+                                  (mapcat (fn [[setting results]]
+                                            (let [best-results (fn [metric]
+                                                                 (best-metric-groups [:setting-results setting
+                                                                                      metric dataset]))
                                                   total-entropy-change (compute-certainty-change results "total_entropy")
                                                   aleatoric-entropy-change (compute-certainty-change results "aleatoric_entropy")
                                                   epistemic-entropy-change (compute-certainty-change results "epistemic_entropy")
                                                   epistemic-entropy-diff-change (compute-certainty-change results "epistemic_entropy_diff")]
-                                              (concat (map #(round % 4 100)
-                                                           [(:id_accuracy results) (:id_accuracy_se results 0)
-                                                            (:ood_accuracy results) (:ood_accuracy_se results 0)
-                                                            (:ood_detection_total_auroc results)
-                                                            (:ood_detection_total_auroc_se results 0)
-                                                            (:ood_detection_total_entropy_auroc results)
-                                                            (:ood_detection_total_entropy_auroc_se results 0)
-                                                            (:ood_detection_aleatoric_auroc results)
-                                                            (:ood_detection_aleatoric_auroc_se results 0)
-                                                            (:ood_detection_aleatoric_entropy_auroc results)
-                                                            (:ood_detection_aleatoric_entropy_auroc_se results 0)
-                                                            (:ood_detection_epistemic_auroc results)
-                                                            (:ood_detection_epistemic_auroc_se results 0)
-                                                            (:ood_detection_epistemic_entropy_auroc results)
-                                                            (:ood_detection_epistemic_entropy_auroc_se results 0)
-                                                            (:ood_detection_epistemic_entropy_diff_auroc results)
-                                                            (:ood_detection_epistemic_entropy_diff_auroc_se results 0)])
+                                              (concat (mapcat #(get-metric results best-results %)
+                                                              settings-metrics)
                                                       (map #(round % 4 100 :sign true)
                                                            [total-entropy-change
                                                             aleatoric-entropy-change
                                                             epistemic-entropy-change
                                                             epistemic-entropy-diff-change])))))
-                                  setting-names))))
-                rows)
+                                  setting-results))))
+              rows)
         csv (str/join "\n" (cons head body))]
     (log/info (str "Creating table with " (count cols) " columns..."))
     (spit "tables/id_ood.csv" csv))
