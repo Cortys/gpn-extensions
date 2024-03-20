@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 from torch_geometric.data import Data
+from gpn.layers.appnp_propagation import APPNPPropagation
 from gpn.layers.evidence import Density
 from gpn.models.gat import GAT
 from gpn.models.gcn import GCN
@@ -17,10 +18,6 @@ class CUQ_GNN(GPN):
         super().__init__(params)
 
     def init_propagation(self):
-        assert self.params.convolution_name in (
-            "gcn",
-            "gat",
-        )
         assert isinstance(self.params.dim_hidden, int)
         params = self.params.clone()
         params.set_values(
@@ -29,14 +26,33 @@ class CUQ_GNN(GPN):
         )
         if self.params.convolution_name == "gcn":
             self.gnn = GCN(params)
-        else:
+            self.gnn_fn = lambda data: self.gnn.forward_impl(data)
+        elif self.params.convolution_name == "gat":
             self.gnn = GAT(params)
+            self.gnn_fn = lambda data: self.gnn.forward_impl(data)
+        elif self.params.convolution_name == "appnp":
+            normalization = self.params.adj_normalization
+            if normalization is None:
+                normalization = self.default_normalization
+            self.gnn = APPNPPropagation(
+                K=self.params.K,
+                alpha=self.params.alpha_teleport,
+                add_self_loops=self.params.add_self_loops,
+                cached=False,
+                normalization=normalization
+            )
+            self.gnn_fn = lambda data: self.gnn(
+                data.x,
+                data.edge_index if data.edge_index is not None else data.adj_t
+            )
+        else:
+            raise ValueError("Invalid convolution_name.")
 
     def forward_impl(self, data: Data) -> Prediction:
         h = self.input_encoder(data.x)
         new_data = data.clone()
         new_data["x"] = h
-        h = self.gnn.forward_impl(new_data)
+        h = self.gnn_fn(new_data)
         z = self.latent_encoder(h)
 
         # compute feature evidence (with Normalizing Flows)

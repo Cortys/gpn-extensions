@@ -19,10 +19,10 @@
                            {:model.sparse_propagation "True"}))
 (def datasets
   {"CoraML" default-ds
-   "CiteSeerFull" (assoc default-ds ::inline-name "CiteSeer")
-   "AmazonPhotos" (assoc big-default-ds ::inline-name "Amazon\\\\Photos")
-   "AmazonComputers" (assoc big-default-ds ::inline-name "Amazon\\\\Computers")
-   "PubMedFull" (assoc big-default-ds ::inline-name "PubMed")
+   "CiteSeerFull" (assoc default-ds ::colname "CiteSeer" ::inline-name "CiteSeer")
+   "AmazonPhotos" (assoc big-default-ds ::colname "Photos" ::inline-name "Amazon\\\\Photos")
+   "AmazonComputers" (assoc big-default-ds ::colname "Computers" ::inline-name "Amazon\\\\Computers")
+   "PubMedFull" (assoc big-default-ds ::colname "PubMed" ::inline-name "PubMed")
    "ogbn-arxiv" (merge big-default-ds
                        {::colname "Arxiv"
                         ::inline-name "OGBN\\\\Arxiv"
@@ -34,16 +34,21 @@
                         :run.log "True"})})
 
 (def models
-  {"appnp" {::name "appnp" ::inline-name "APPNP"}
+  {"appnp" {::name "appnp"
+            ::inline-name "APPNP"
+            ::ignored-metrics [:ood_detection_aleatoric_auroc
+                               :ood_detection_aleatoric_entropy_auroc]}
    "ggp" {::name "ggp"
           ::inline-name "GGP"
           :run.num_inits 1}
    "matern_ggp" {::name "matern_ggp"
                  ::colname "maternGGP"
                  ::inline-name "Matern-GGP"
+                 ::ignored-metrics [:ood_detection_aleatoric_auroc
+                                    :ood_detection_aleatoric_entropy_auroc]
                  :run.num_inits 1}
    "gdk" {::name "gdk" ::inline-name "GKDE"}
-   "gpn" {::name "gpn_16" ::inline-name "GPN (sym)"}
+   "gpn" {::name "gpn_16" ::inline-name "GPN"}
    "gpn_rw" {::name "gpn_16"
              ::colname "gpnRW"
              ::inline-name "GPN (rw)"
@@ -57,6 +62,11 @@
               ::colname "gpnLOP"
               :model.model_name "GPN_LOP"
               :model.sparse_x_prune_threshold 0.01}
+   "cuq_appnp" {::name "gpn_16"
+                ::colname "cuqAPPNP"
+                ::inline-name "CUQ-APPNP"
+                :model.model_name "CUQ_GNN"
+                :model.convolution_name "appnp"}
    "cuq_gcn" {::name "gpn_16"
               ::colname "cuqGCN"
               ::inline-name "CUQ-GCN"
@@ -114,8 +124,9 @@
                      "matern_ggp"
                      "gdk"
                      "gpn"
-                     "gpn_rw"
-                     "gpn_lop"
+                     #_"gpn_rw"
+                     #_"gpn_lop"
+                     "cuq_appnp"
                      "cuq_gcn"
                      "cuq_gat"])
 (def default-settings ["classification"
@@ -219,11 +230,12 @@
                                               model-name
                                               setting-name)
         results-path (str "results/" combination-id ".json")
-        params (build-config-cli-params dataset-name
-                                        model-name
-                                        setting-name
-                                        (assoc overrides :run.results_path results-path))]
-    (when (::skip (last params))
+        [_ config :as params]
+        (build-config-cli-params dataset-name
+                                 model-name
+                                 setting-name
+                                 (assoc overrides :run.results_path results-path))]
+    (when (::skip config)
       (throw (ex-info (str "Skipped " combination-id ".")
                       {::cause :skip
                        :dataset-name dataset-name
@@ -249,7 +261,8 @@
           (apply run-config! params))))
     (when-not delete
       (let [results (json/parse-stream (io/reader results-path) true)
-            results (update-cached-results results (last params))]
+            results (update-cached-results results config)
+            results (update-vals results #(apply dissoc % (::ignored-metrics config)))]
         results))))
 
 (defn try-get-results
@@ -454,15 +467,17 @@
          (dec (/ (- ood-certainty) (Math/abs norm))))))))
 
 (defn round
-  ([n places]
-   (round n places 1))
-  ([n places factor & {:keys [sign] :or {sign false}}]
+  ([n places & {:keys [factor decimals sign]
+                :or {factor 1
+                     decimals (dec places)
+                     sign false}}]
    (when n
-     (let [scale (Math/pow 10 (dec places))
+     (let [scale (Math/pow 10 decimals)
            num (/ (Math/round (* n scale factor)) scale)
-           res (format (str "%." places "f") num)
+           res (format (str "%." decimals "f") num)
            l (inc places)
-           l (if (pos? num) l (inc l))
+           l (if (and (not sign) (pos? num)) l (inc l))
+           l (min (count res) l)
            res (subs res 0 l)]
        (if (and sign (pos? num))
          (str "+" res)
@@ -477,8 +492,8 @@
   [results best-results metric]
   (let [result (metric results)
         best-result (best-results metric)]
-    [(round result 4 100)
-     (round (get-se results metric) 4 100)
+    [(round result 4 :decimals 2 :factor 100)
+     (round (get-se results metric) 4 :decimals 2 :factor 100)
      (if (and result best-result (>= result best-result)) "1" "0")]))
 
 (defn run-id-ood-table-gen!
@@ -568,7 +583,7 @@
                                                   epistemic-entropy-diff-change (compute-certainty-change results "epistemic_entropy_diff")]
                                               (concat (mapcat #(get-metric results best-results %)
                                                               settings-metrics)
-                                                      (map #(round % 4 100 :sign true)
+                                                      (map #(round % 4 :factor 100 :sign true)
                                                            [total-entropy-change
                                                             aleatoric-entropy-change
                                                             epistemic-entropy-change
