@@ -63,8 +63,8 @@
               :model.model_name "GPN_LOP"
               :model.sparse_x_prune_threshold 0.01}
    "cuq_appnp" {::name "gpn_16"
-                ::colname "cuqAPPNP"
-                ::inline-name "CUQ-APPNP"
+                ::colname "cuqPPR"
+                ::inline-name "CUQ-PPR"
                 :model.model_name "CUQ_GNN"
                 :model.convolution_name "appnp"}
    "cuq_gcn" {::name "gpn_16"
