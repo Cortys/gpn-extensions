@@ -121,7 +121,7 @@
                        "PubMedFull"
                        "ogbn-arxiv"])
 (def default-models ["appnp"
-                     "matern_ggp"
+                     #_"matern_ggp"
                      "gdk"
                      "gpn"
                      #_"gpn_rw"
