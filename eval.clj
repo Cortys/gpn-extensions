@@ -36,16 +36,14 @@
 (def models
   {"appnp" {::name "appnp"
             ::inline-name "APPNP"
-            ::ignored-metrics [:ood_detection_aleatoric_auroc
-                               :ood_detection_aleatoric_entropy_auroc]}
+            ::ignored-metrics [:ood_detection_aleatoric_entropy_auroc]}
    "ggp" {::name "ggp"
           ::inline-name "GGP"
           :run.num_inits 1}
    "matern_ggp" {::name "matern_ggp"
                  ::colname "maternGGP"
                  ::inline-name "Matern-GGP"
-                 ::ignored-metrics [:ood_detection_aleatoric_auroc
-                                    :ood_detection_aleatoric_entropy_auroc]
+                 ::ignored-metrics [:ood_detection_aleatoric_entropy_auroc]
                  :run.num_inits 1}
    "gdk" {::name "gdk" ::inline-name "GKDE"}
    "gpn" {::name "gpn_16" ::inline-name "GPN"}
@@ -132,7 +130,7 @@
 (def default-settings ["classification"
                        "ood_loc"
                        "ood_features_normal"
-                       #_"ood_features_ber"])
+                       "ood_features_ber"])
 
 ;; Utils
 
