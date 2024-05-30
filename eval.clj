@@ -19,10 +19,10 @@
                            {:model.sparse_propagation "True"}))
 (def datasets
   {"CoraML" default-ds
-   "CiteSeerFull" (assoc default-ds ::inline-name "CiteSeer")
-   "AmazonPhotos" (assoc big-default-ds ::inline-name "Amazon\\\\Photos")
-   "AmazonComputers" (assoc big-default-ds ::inline-name "Amazon\\\\Computers")
-   "PubMedFull" (assoc big-default-ds ::inline-name "PubMed")
+   "CiteSeerFull" (assoc default-ds ::colname "CiteSeer" ::inline-name "CiteSeer")
+   "AmazonPhotos" (assoc big-default-ds ::colname "Photos" ::inline-name "Amazon\\\\Photos")
+   "AmazonComputers" (assoc big-default-ds ::colname "Computers" ::inline-name "Amazon\\\\Computers")
+   "PubMedFull" (assoc big-default-ds ::colname "PubMed" ::inline-name "PubMed")
    "ogbn-arxiv" (merge big-default-ds
                        {::colname "Arxiv"
                         ::inline-name "OGBN\\\\Arxiv"
@@ -35,7 +35,9 @@
                         :run.log "True"})})
 
 (def models
-  {"appnp" {::name "appnp" ::inline-name "APPNP"}
+  {"appnp" {::name "appnp"
+            ::inline-name "APPNP"
+            ::ignored-metrics [:ood_detection_aleatoric_entropy_auroc]}
    "ggp" {::name "ggp"
           ::inline-name "GGP"
           :run.num_inits 1}
@@ -95,7 +97,7 @@
 (def default-settings ["classification"
                        "ood_loc"
                        "ood_features_normal"
-                       #_"ood_features_ber"])
+                       "ood_features_ber"])
 
 ;; Utils
 
@@ -183,19 +185,22 @@
 
 (defn get-results
   [dataset-name model-name setting-name overrides
-   & {:keys [only-cached no-cache]
-      :or {only-cached false no-cache false}}]
+   & {:keys [only-cached no-cache delete]
+      :or {only-cached false no-cache false delete false}}]
   (assert (not (and only-cached no-cache))
           "only-cached and no-cache cannot be enabled at the same time.")
+  (assert (not (and only-cached delete))
+          "only-cached and delete cannot be enabled at the same time.")
   (let [combination-id (stringify-combination dataset-name
                                               model-name
                                               setting-name)
         results-path (str "results/" combination-id ".json")
-        params (build-config-cli-params dataset-name
-                                        model-name
-                                        setting-name
-                                        (assoc overrides :run.results_path results-path))]
-    (when (::skip (last params))
+        [_ config :as params]
+        (build-config-cli-params dataset-name
+                                 model-name
+                                 setting-name
+                                 (assoc overrides :run.results_path results-path))]
+    (when (::skip config)
       (throw (ex-info (str "Skipped " combination-id ".")
                       {::cause :skip
                        :dataset-name dataset-name
@@ -204,7 +209,7 @@
                        :overrides overrides})))
     (if (and (not (:run.retrain overrides))
              (not (:run.reeval overrides))
-             (not no-cache)
+             (not no-cache) (not delete)
              (fs/exists? results-path))
       (log/debug "Loading" combination-id "from cache...")
       (if only-cached
@@ -215,12 +220,15 @@
                          :setting-name setting-name
                          :overrides overrides}))
         (do
-          (log/info "Running" combination-id "...")
+          (log/info (if delete "Deleting" "Running")
+                    combination-id "...")
           (fs/create-dirs (fs/parent results-path))
           (apply run-config! params))))
-    (let [results (json/parse-stream (io/reader results-path) true)
-          results (update-cached-results results (last params))]
-      results)))
+    (when-not delete
+      (let [results (json/parse-stream (io/reader results-path) true)
+            results (update-cached-results results config)
+            results (update-vals results #(apply dissoc % (::ignored-metrics config)))]
+        results))))
 
 (defn try-get-results
   [& args]
@@ -267,24 +275,43 @@
 
 (defn run-eval!
   [{:keys [dataset model setting override
-           dry retrain reeval only-cached cache]
+           dry retrain reeval only-cached cache delete]
     :or {dataset default-datasets
          model default-models
          setting default-settings}}]
   (let [default-config (cond-> {}
                          retrain (assoc :run.retrain true)
-                         reeval (assoc :run.reeval true))
+                         reeval (assoc :run.reeval true)
+                         delete (assoc :run.delete_run true))
         override (into default-config (map parse-override) override)]
     (print-grid dataset model setting override)
+    (when delete
+      (print "\nAre you sure you want to delete all results listed above? (y/N) ")
+      (flush)
+      (let [input (read-line)]
+        (if (str/starts-with? (str/lower-case input) "y")
+          (do
+            (log/info "Will start deleting all selected results in 3s...")
+            (Thread/sleep 1000)
+            (log/info "Will start deleting all selected results in 2s...")
+            (Thread/sleep 1000)
+            (log/info "Will start deleting all selected results in 1s...")
+            (Thread/sleep 1000)
+            (log/info "Deleting..."))
+          (do
+            (log/error "Aborted.")
+            (System/exit 1)))))
     (when-not dry
-      (log/info (str "Starting experiments ("
+      (log/info (str (if delete "Deleting" "Starting")
+                     " experiments ("
                      "only-cached=" only-cached ", "
                      "cache=" cache
                      ")..."))
       (Thread/sleep 500)
       (run-combinations! dataset model setting override
                          :only-cached only-cached
-                         :no-cache (not cache)))
+                         :no-cache (not cache)
+                         :delete delete))
     (log/info "Done.")))
 
 ;; Accuracy-rejection tables
@@ -400,24 +427,40 @@
        (if (not= (math/signum ood-certainty) (math/signum norm))
          (do (log/warn "Sign mismatch" {:uncertainty-type uncertainty-type
                                         :ood-certainty ood-certainty
-                                        :norm norm})
+                                        :norm norm
+                                        :total-norm total-norm})
              nil)
          (dec (/ (- ood-certainty) (Math/abs norm))))))))
 
 (defn round
-  ([n places]
-   (round n places 1))
-  ([n places factor & {:keys [sign] :or {sign false}}]
+  ([n places & {:keys [factor decimals sign]
+                :or {factor 1
+                     decimals (dec places)
+                     sign false}}]
    (when n
-     (let [scale (Math/pow 10 (dec places))
+     (let [scale (Math/pow 10 decimals)
            num (/ (Math/round (* n scale factor)) scale)
-           res (format (str "%." places "f") num)
+           res (format (str "%." decimals "f") num)
            l (inc places)
-           l (if (pos? num) l (inc l))
+           l (if (and (not sign) (pos? num)) l (inc l))
+           l (min (count res) l)
            res (subs res 0 l)]
        (if (and sign (pos? num))
          (str "+" res)
          res)))))
+
+(defn get-se
+  [results metric]
+  (let [se (keyword (str metric "_se"))]
+    (se results 0)))
+
+(defn get-metric
+  [results best-results metric]
+  (let [result (metric results)
+        best-result (best-results metric)]
+    [(round result 4 :decimals 2 :factor 100)
+     (round (get-se results metric) 4 :decimals 2 :factor 100)
+     (if (and result best-result (>= result best-result)) "1" "0")]))
 
 (defn run-id-ood-table-gen!
   [& _]
@@ -425,78 +468,94 @@
   (let [dataset-names default-datasets
         model-names default-models
         setting-names (rest default-settings)
-        cols (into ["id" "dataset" "model" "acc" "accSE"]
+        class-metrics [:accuracy]
+        settings-metrics [:id_accuracy
+                          :ood_accuracy
+                          :ood_detection_total_auroc
+                          :ood_detection_total_entropy_auroc
+                          :ood_detection_aleatoric_auroc
+                          :ood_detection_aleatoric_entropy_auroc
+                          :ood_detection_epistemic_auroc
+                          :ood_detection_epistemic_entropy_auroc
+                          :ood_detection_epistemic_entropy_diff_auroc]
+        cols (into ["id" "dataset" "model" "acc" "accSE" "accBest"]
                    (mapcat (fn [setting]
                              (let [setting (-> setting settings ::colname)]
-                               [(str setting "IdAcc")
-                                (str setting "IdAccSE")
-                                (str setting "OodAcc")
-                                (str setting "OodAccSE")
-                                (str setting "OodTotal")
-                                (str setting "OodTotalSE")
-                                (str setting "OodTotalEntropy")
-                                (str setting "OodTotalEntropySE")
-                                (str setting "OodAleatoric")
-                                (str setting "OodAleatoricSE")
-                                (str setting "OodAleatoricEntropy")
-                                (str setting "OodAleatoricEntropySE")
-                                (str setting "OodEpistemic")
-                                (str setting "OodEpistemicSE")
-                                (str setting "OodEpistemicEntropy")
-                                (str setting "OodEpistemicEntropySE")
-                                (str setting "OodEpistemicEntropyDiff")
-                                (str setting "OodEpistemicEntropyDiffSE")
-                                (str setting "TotalEntropyChange")
-                                (str setting "AleatoricEntropyChange")
-                                (str setting "EpistemicEntropyChange")
-                                (str setting "EpistemicEntropyDiffChange")])))
+                               (concat
+                                (mapcat #(do [% (str % "SE") (str % "Best")])
+                                        [(str setting "IdAcc")
+                                         (str setting "OodAcc")
+                                         (str setting "OodTotal")
+                                         (str setting "OodTotalEntropy")
+                                         (str setting "OodAleatoric")
+                                         (str setting "OodAleatoricEntropy")
+                                         (str setting "OodEpistemic")
+                                         (str setting "OodEpistemicEntropy")
+                                         (str setting "OodEpistemicEntropyDiff")])
+                                [(str setting "TotalEntropyChange")
+                                 (str setting "AleatoricEntropyChange")
+                                 (str setting "EpistemicEntropyChange")
+                                 (str setting "EpistemicEntropyDiffChange")]))))
                    setting-names)
         head (str/join "," cols)
-        rows (for [d dataset-names, m model-names] [d m])
+        rows (for [dataset dataset-names
+                   model model-names
+                   :let [class-results
+                         (-> (try-get-results dataset model "classification" {}
+                                              :only-cached true)
+                             :test)
+                         setting-results (zipmap setting-names
+                                                 (map (fn [setting]
+                                                        (-> (try-get-results dataset model setting {}
+                                                                             :only-cached true)
+                                                            :test))
+                                                      setting-names))]]
+               {:dataset dataset
+                :model model
+                :class-results class-results
+                :setting-results setting-results})
+        metrics (concat (map #(do [:class-results %]) class-metrics)
+                        (for [setting setting-names
+                              metric settings-metrics]
+                          [:setting-results setting metric]))
+        row-groups (group-by :dataset rows)
+        best-metric-groups
+        (into {}
+              (mapcat (fn [[group rows]]
+                        (map (fn [metric]
+                               (let [vals (keep #(get-in % metric) rows)
+                                     best-val (apply max ##-Inf vals)]
+                                 [(conj metric group) best-val]))
+                             metrics)))
+              row-groups)
         body (map-indexed
-              (fn [i [dataset model]]
-                (let [class-results (-> (try-get-results dataset model "classification" {}
-                                                         :only-cached true)
-                                        :test)
-                      row [i
+              (fn [i {:keys [dataset model class-results setting-results]}]
+                (let [row [i
                            (-> dataset datasets (::inline-name dataset))
-                           (-> model models (::inline-name model))
-                           (-> class-results :accuracy)
-                           (-> class-results (:accuracy_se 0))]]
+                           (-> model models (::inline-name model))]
+                      class-best-results (fn [metric] (best-metric-groups [:class-results metric dataset]))
+                      row (into row
+                                (mapcat #(get-metric class-results class-best-results %))
+                                class-metrics)]
                   (str/join ","
                             (into row
-                                  (mapcat (fn [setting]
-                                            (let [results (try-get-results dataset model setting {}
-                                                                           :only-cached true)
-                                                  results (:test results)
+                                  (mapcat (fn [[setting results]]
+                                            (let [best-results (fn [metric]
+                                                                 (best-metric-groups [:setting-results setting
+                                                                                      metric dataset]))
                                                   total-entropy-change (compute-certainty-change results "total_entropy")
                                                   aleatoric-entropy-change (compute-certainty-change results "aleatoric_entropy")
                                                   epistemic-entropy-change (compute-certainty-change results "epistemic_entropy")
                                                   epistemic-entropy-diff-change (compute-certainty-change results "epistemic_entropy_diff")]
-                                              (concat (map #(round % 4 100)
-                                                           [(:id_accuracy results) (:id_accuracy_se results 0)
-                                                            (:ood_accuracy results) (:ood_accuracy_se results 0)
-                                                            (:ood_detection_total_auroc results)
-                                                            (:ood_detection_total_auroc_se results 0)
-                                                            (:ood_detection_total_entropy_auroc results)
-                                                            (:ood_detection_total_entropy_auroc_se results 0)
-                                                            (:ood_detection_aleatoric_auroc results)
-                                                            (:ood_detection_aleatoric_auroc_se results 0)
-                                                            (:ood_detection_aleatoric_entropy_auroc results)
-                                                            (:ood_detection_aleatoric_entropy_auroc_se results 0)
-                                                            (:ood_detection_epistemic_auroc results)
-                                                            (:ood_detection_epistemic_auroc_se results 0)
-                                                            (:ood_detection_epistemic_entropy_auroc results)
-                                                            (:ood_detection_epistemic_entropy_auroc_se results 0)
-                                                            (:ood_detection_epistemic_entropy_diff_auroc results)
-                                                            (:ood_detection_epistemic_entropy_diff_auroc_se results 0)])
-                                                      (map #(round % 4 100 :sign true)
+                                              (concat (mapcat #(get-metric results best-results %)
+                                                              settings-metrics)
+                                                      (map #(round % 4 :factor 100 :sign true)
                                                            [total-entropy-change
                                                             aleatoric-entropy-change
                                                             epistemic-entropy-change
                                                             epistemic-entropy-diff-change])))))
-                                  setting-names))))
-                rows)
+                                  setting-results))))
+              rows)
         csv (str/join "\n" (cons head body))]
     (log/info (str "Creating table with " (count cols) " columns..."))
     (spit "tables/id_ood.csv" csv))
@@ -549,6 +608,10 @@
                          {:as "No Cache"
                           :option "cache"
                           :default true
+                          :type :with-flag}
+                         {:as "Delete existing models and results"
+                          :option "delete"
+                          :default false
                           :type :with-flag}]
                   :runs run-eval!}
                  {:command "acc-rej-tables"
