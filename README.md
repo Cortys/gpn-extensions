@@ -1,11 +1,11 @@
-# LOP-GPN: Linear Opinion Pooling for Uncertainty Quantification on Graphs
-
 <p align=center>
     <img src="gfx/lop-gpn-aggregation-dark.svg#gh-dark-mode-only" alt="LOP-GPN" width="70%">
     <img src="gfx/lop-gpn-aggregation.svg#gh-light-mode-only" alt="LOP-GPN" width="70%">
 </p>
 
-This is the official implementation of the *Linear Opinion Pooled Graph Posterior Network* (LOP-GPN) model by Damke and Hüllermeier.
+# Linear Opinion Pooling for Uncertainty Quantification on Graphs
+
+This is the official implementation of the *Linear Opinion Pooled Graph Posterior Network* (**LOP-GPN**) model by Damke and Hüllermeier.
 The implementation based on the official implementation of [Graph Posterior Networks](https://github.com/stadlmax/Graph-Posterior-Network) by Stadler et al. (see [citation](#Cite)).
 
 The following additions were made:
