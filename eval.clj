@@ -393,6 +393,7 @@
                                             (get se i 0)]))
                                        model-names))))
         csv (str/join "\n" (cons head body))]
+    (fs/create-dirs "tables")
     (spit (str "tables/acc_rej_" type "_" (-> dataset datasets (::colname dataset)) ".csv") csv)))
 
 (defn run-acc-rej-tables-gen!
@@ -558,6 +559,7 @@
               rows)
         csv (str/join "\n" (cons head body))]
     (log/info (str "Creating table with " (count cols) " columns..."))
+    (fs/create-dirs "tables")
     (spit "tables/id_ood.csv" csv))
   (log/info "Done."))
 
