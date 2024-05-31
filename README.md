@@ -1,8 +1,12 @@
 # LOP-GPN: Linear Opinion Pooling for Uncertainty Quantification on Graphs
 
-<p align=center><img src="lop-gpn.png" alt="LOP-GPN"></p>
+<p align=center>
+    <img src="gfx/lop-gpn-aggregation-dark.svg#gh-dark-mode-only" alt="LOP-GPN" width="70%">
+    <img src="gfx/lop-gpn-aggregation.svg#gh-light-mode-only" alt="LOP-GPN" width="70%">
+</p>
 
-This is the implementation of the *Linear Opinion Pooled Graph Posterior Network* (LOP-GPN) model, it is based on the official implementation of [Graph Posterior Networks](https://github.com/stadlmax/Graph-Posterior-Network) by Maximilian Stadler.
+This is the official implementation of the *Linear Opinion Pooled Graph Posterior Network* (LOP-GPN) model by Damke and Hüllermeier.
+The implementation based on the official implementation of [Graph Posterior Networks](https://github.com/stadlmax/Graph-Posterior-Network) by Stadler et al. (see [citation](#Cite)).
 
 The following additions were made:
 - Implementation of LOP-GPN
@@ -30,8 +34,8 @@ To replicate the results from the paper, you can simply run the following comman
 ./eval.clj acc-rej-tables # Aggregate the evaluation results into accuracy-rejection curves (CSV)
 ./eval.clj id-ood-table # Aggregate the OOD evaluation results into a table (CSV)
 ```
-The individual trained model are written to `saved_experiments` and their evaluations are written to `results`.
-All aggregated results are written as `*.csv` files to a `tables` directory.
+The trained model weights are written to `saved_experiments` and their aggregated evaluation results are written to `results`.
+Accuracy-rejection curves and the OOD evaluation table are written as `*.csv` files to a `tables` directory.
 
 Note that the implementation has only been tested on Linux; it might not run on MacOS or Windows.
 
@@ -72,3 +76,26 @@ The main implementation of LOP-GPN is split across the following files:
 - [`gpn_base.py`](./gpn/models/gpn_base.py): The GPN base implementation was made more generic to make it compatible with LOP-GPN.
 - [`loss.py`](./gpn/nn/loss.py#L58): The loss for LOP-GPN is computed via the `mixture_uce_loss` and `categorical_entropy_reg` functions.
 - [`appnp_propagation.py`](./gpn/layers/appnp_propagation.py): The APPNP implementation was extended by support for fully-sparse feature and adjacency matrices, to make LOP-GPN computationally tractable.
+
+## Cite
+
+Please cite, both, our paper and that by Stadler et al. if you use the model or this code in your own work.
+
+```
+@inproceedings{lop-gpn,
+title={Linear Opinion Pooling for Uncertainty Quantification on Graphs},
+author={Damke, Clemens and H{\"u}llermeier, Eyke},
+booktitle={The 40th Conference on Uncertainty in Artificial Intelligence},
+year={2024},
+url={https://openreview.net/forum?id=qLGkfpXTSn}
+}
+
+@incollection{graph-postnet,
+title={Graph Posterior Network: Bayesian Predictive Uncertainty for Node Classification},
+author={Stadler, Maximilian and Charpentier, Bertrand and Geisler, Simon and Z{\"u}gner, Daniel and G{\"u}nnemann, Stephan},
+booktitle = {Advances in Neural Information Processing Systems},
+volume = {34},
+publisher = {Curran Associates, Inc.},
+year = {2021}
+}
+```
