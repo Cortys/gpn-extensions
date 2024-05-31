@@ -90,7 +90,9 @@ booktitle={The 40th Conference on Uncertainty in Artificial Intelligence},
 year={2024},
 url={https://openreview.net/forum?id=qLGkfpXTSn}
 }
+```
 
+```
 @incollection{graph-postnet,
 title={Graph Posterior Network: Bayesian Predictive Uncertainty for Node Classification},
 author={Stadler, Maximilian and Charpentier, Bertrand and Geisler, Simon and Z{\"u}gner, Daniel and G{\"u}nnemann, Stephan},
