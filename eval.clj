@@ -71,6 +71,8 @@
                        :data.ood_perturbation_type "bernoulli_0.5"
                        :run.experiment_name "ood_features_ber"}})
 
+(declare transform-matern-ggp-results)
+
 (def combination-overrides
   {{::model "gpn_lop" ::dataset "PubMedFull"}
    {:run.log "True"}
@@ -79,6 +81,8 @@
     :run.num_inits 2}
    {::model "gdk" ::dataset "ogbn-arxiv"}
    {:model.gdk_cutoff 2}
+   {::model "matern_ggp"}
+   {::transform #'transform-matern-ggp-results}
    {::model "matern_ggp" ::dataset "ogbn-arxiv"}
    {::skip true}})
 
@@ -98,6 +102,19 @@
                        "ood_loc"
                        "ood_features_normal"
                        "ood_features_ber"])
+
+;; Result post-processing
+;; Some results need some post-processing to fix inconsistencies in how some results were labeled.
+(defn transform-matern-ggp-results
+  [results]
+  (update-vals results
+               (fn [{:keys [ood_detection_epistemic_auroc]
+                     :as r}]
+                 (merge r
+                        {:ood_detection_total_entropy_auroc nil
+                         :ood_detection_epistemic_auroc nil
+                         :ood_detection_epistemic_entropy_auroc
+                         ood_detection_epistemic_auroc}))))
 
 ;; Utils
 
@@ -226,6 +243,8 @@
           (apply run-config! params))))
     (when-not delete
       (let [results (json/parse-stream (io/reader results-path) true)
+            transform (::transform config)
+            results (if transform (transform results) results)
             results (update-cached-results results config)
             results (update-vals results #(apply dissoc % (::ignored-metrics config)))]
         results))))
