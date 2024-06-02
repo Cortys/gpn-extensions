@@ -111,8 +111,7 @@
                (fn [{:keys [ood_detection_epistemic_auroc]
                      :as r}]
                  (merge r
-                        {:ood_detection_total_entropy_auroc nil
-                         :ood_detection_epistemic_auroc nil
+                        {:ood_detection_epistemic_auroc nil
                          :ood_detection_epistemic_entropy_auroc
                          ood_detection_epistemic_auroc}))))
 
