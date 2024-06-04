@@ -3,7 +3,8 @@
 &nbsp;
 <img src="gfx/cuq-gnn-dark.svg#gh-dark-mode-only" alt="CUQ-GNN" width="47%" align=right>
 <img src="gfx/cuq-gnn-aggregation.svg#gh-light-mode-only" alt="CUQ-GNN" width="47%" align=right>
-<h1 align=center style="clear:both;">LOP-GPN & CUQ-GNN</h1>
+<hr style="clear:both;">
+<h1 align=center>LOP-GPN & CUQ-GNN</h1>
 <p align=center><b>Extensions of Graph Posterior Networks</b></p>
 <hr style="clear:both;">
 
