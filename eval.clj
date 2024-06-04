@@ -94,6 +94,8 @@
                        :data.ood_perturbation_type "bernoulli_0.5"
                        :run.experiment_name "ood_features_ber"}})
 
+(declare transform-matern-ggp-results)
+
 (def combination-overrides
   {{::model "gpn_lop" ::dataset "PubMedFull"}
    {:run.log "True"}
@@ -102,6 +104,8 @@
     :run.num_inits 2}
    {::model "gdk" ::dataset "ogbn-arxiv"}
    {:model.gdk_cutoff 2}
+   {::model "matern_ggp"}
+   {::transform #'transform-matern-ggp-results}
    {::model "matern_ggp" ::dataset "ogbn-arxiv"}
    {::skip true}
    ;; {::model "cuq_gcn"}
@@ -131,6 +135,18 @@
                        "ood_loc"
                        "ood_features_normal"
                        "ood_features_ber"])
+
+;; Result post-processing
+;; Some results need some post-processing to fix inconsistencies in how some results were labeled.
+(defn transform-matern-ggp-results
+  [results]
+  (update-vals results
+               (fn [{:keys [ood_detection_epistemic_auroc]
+                     :as r}]
+                 (merge r
+                        {:ood_detection_epistemic_auroc nil
+                         :ood_detection_epistemic_entropy_auroc
+                         ood_detection_epistemic_auroc}))))
 
 ;; Utils
 
@@ -259,6 +275,8 @@
           (apply run-config! params))))
     (when-not delete
       (let [results (json/parse-stream (io/reader results-path) true)
+            transform (::transform config)
+            results (if transform (transform results) results)
             results (update-cached-results results config)
             results (update-vals results #(apply dissoc % (::ignored-metrics config)))]
         results))))
@@ -426,6 +444,7 @@
                                             (get se i 0)]))
                                        model-names))))
         csv (str/join "\n" (cons head body))]
+    (fs/create-dirs "tables")
     (spit (str "tables/acc_rej_" type "_" (-> dataset datasets (::colname dataset)) ".csv") csv)))
 
 (defn run-acc-rej-tables-gen!
@@ -460,7 +479,8 @@
        (if (not= (math/signum ood-certainty) (math/signum norm))
          (do (log/warn "Sign mismatch" {:uncertainty-type uncertainty-type
                                         :ood-certainty ood-certainty
-                                        :norm norm})
+                                        :norm norm
+                                        :total-norm total-norm})
              nil)
          (dec (/ (- ood-certainty) (Math/abs norm))))))))
 
@@ -537,11 +557,11 @@
                                               :only-cached true)
                              :test)
                          setting-results (zipmap setting-names
-                                                  (map (fn [setting]
-                                                         (-> (try-get-results dataset model setting {}
-                                                                              :only-cached true)
-                                                             :test))
-                                                       setting-names))]]
+                                                 (map (fn [setting]
+                                                        (-> (try-get-results dataset model setting {}
+                                                                             :only-cached true)
+                                                            :test))
+                                                      setting-names))]]
                {:dataset dataset
                 :model model
                 :class-results class-results
@@ -590,6 +610,7 @@
               rows)
         csv (str/join "\n" (cons head body))]
     (log/info (str "Creating table with " (count cols) " columns..."))
+    (fs/create-dirs "tables")
     (spit "tables/id_ood.csv" csv))
   (log/info "Done."))
 
