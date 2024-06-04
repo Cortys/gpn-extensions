@@ -1,10 +1,11 @@
-<p align=center>
-    <img src="gfx/lop-gpn-aggregation-dark.svg#gh-dark-mode-only" alt="LOP-GPN" width="50%">
-    <img src="gfx/lop-gpn-aggregation.svg#gh-light-mode-only" alt="LOP-GPN" width="40%">
-</p>
+<img src="gfx/lop-gpn-aggregation-dark.svg#gh-dark-mode-only" alt="LOP-GPN" width="33%" align=left>
+<img src="gfx/cuq-gnn-dark.svg#gh-dark-mode-only" alt="CUQ-GNN" width="33%" align=right>
+<img src="gfx/lop-gpn-aggregation.svg#gh-light-mode-only" alt="LOP-GPN" width="33%" align=left>
+<img src="gfx/cuq-gnn-aggregation.svg#gh-light-mode-only" alt="CUQ-GNN" width="33%" align=right>
+
 <h1 align=center>LOP-GPN & CUQ-GNN</h1>
 <p align=center><b>Extensions of Graph Posterior Networks</b></p>
-<hr>
+<hr style="clear:both;">
 
 This is the official implementation of the *Linear Opinion Pooled Graph Posterior Network* (**LOP-GPN**) and *Committee-based Graph Uncertainty Quantification using Posterior Networks* (**CUQ-GNN**) models by Damke and Hüllermeier.
 The implementation is based on the official implementation of [Graph Posterior Networks](https://github.com/stadlmax/Graph-Posterior-Network) by Stadler et al. (see [citation](#Cite)).
