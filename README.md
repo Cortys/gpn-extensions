@@ -6,7 +6,7 @@
 <p align=center><b>Extensions of Graph Posterior Networks</b></p>
 <hr style="clear:both;">
 
-This is the official implementation of the *Linear Opinion Pooled Graph Posterior Network* (**LOP-GPN**) and *Committee-based Graph Uncertainty Quantification using Posterior Networks* (**CUQ-GNN**) models by Damke and Hüllermeier.
+This is the official implementation of the [*Linear Opinion Pooled Graph Posterior Network* (**LOP-GPN**)](https://openreview.net/forum?id=qLGkfpXTSn) and *Committee-based Graph Uncertainty Quantification using Posterior Networks* (**CUQ-GNN**) models by Damke and Hüllermeier.
 The implementation is based on the official implementation of [Graph Posterior Networks](https://github.com/stadlmax/Graph-Posterior-Network) by Stadler et al. (see [citation](#Cite)).
 
 The following additions were made:
@@ -87,7 +87,7 @@ The implementation of CUQ-GNN is split across the following files:
 
 If you use LOP-GPN, CUQ-GNN or this code in your own work, please cite, both, our paper(s) and that by Stadler et al.
 
-### LOP-GPN
+### [LOP-GPN](https://openreview.net/forum?id=qLGkfpXTSn)
 ```
 @inproceedings{lop-gpn,
 title={Linear Opinion Pooling for Uncertainty Quantification on Graphs},
