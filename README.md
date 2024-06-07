@@ -1,9 +1,6 @@
 <p align=center>
-    <img src="gfx/lop-gpn-aggregation-dark.svg#gh-dark-mode-only" alt="LOP-GPN" width="47%" align=left>
-    <img src="gfx/lop-gpn-aggregation.svg#gh-light-mode-only" alt="LOP-GPN" width="47%" align=left>
-    &nbsp;
-    <img src="gfx/cuq-gnn-dark.svg#gh-dark-mode-only" alt="CUQ-GNN" width="47%" align=right>
-    <img src="gfx/cuq-gnn.svg#gh-light-mode-only" alt="CUQ-GNN" width="47%" align=right>
+    <img src="gfx/gpn-extensions-dark.svg#gh-dark-mode-only" alt="GPN Extensions">
+    <img src="gfx/gpn-extensions.svg#gh-light-mode-only" alt="GPN Extensions">
 </p>
 <h1 align=center style="clear:both;">LOP-GPN & CUQ-GNN</h1>
 <p align=center><b>Extensions of Graph Posterior Networks</b></p>
