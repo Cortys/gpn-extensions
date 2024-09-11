@@ -6,7 +6,7 @@
 <p align=center><b>Extensions of Graph Posterior Networks</b></p>
 <hr style="clear:both;">
 
-This is the official implementation of the [*Linear Opinion Pooled Graph Posterior Network* (**LOP-GPN**)](https://openreview.net/forum?id=qLGkfpXTSn) and *Committee-based Graph Uncertainty Quantification using Posterior Networks* (**CUQ-GNN**) models by Damke and Hüllermeier.
+This is the official implementation of the [*Linear Opinion Pooled Graph Posterior Network* (**LOP-GPN**)](https://openreview.net/forum?id=qLGkfpXTSn) and [*Committee-based Graph Uncertainty Quantification using Posterior Networks* (**CUQ-GNN**)](https://arxiv.org/abs/2409.04159) models by Damke and Hüllermeier.
 The implementation is based on the official implementation of [Graph Posterior Networks](https://github.com/stadlmax/Graph-Posterior-Network) by Stadler et al. (see [citation](#Cite)).
 
 The following additions were made:
@@ -98,9 +98,19 @@ url={https://openreview.net/forum?id=qLGkfpXTSn}
 }
 ```
 
-### CUQ-GNN
-The reference to our CUQ-GNN paper will be added later.
-
+### [CUQ-GNN](https://arxiv.org/abs/2409.04159)
+```
+@inproceedings{cuq-gnn,
+title={{CUQ-GNN}: Committee-Based Graph Uncertainty Quantification Using Posterior Networks},
+author={Damke, Clemens and H{\"u}llermeier, Eyke},
+editor={Bifet, Albert and Daniu{\v{s}}is, Povilas and Davis, Jesse and Krilavi{\v{c}}ius, Tomas and Kull, Meelis and Ntoutsi, Eirini and Puolam{\"a}ki, Kai and {\v{Z}}liobait{\.{e}}, Indr{\.{e}}},
+booktitle={Machine Learning and Knowledge Discovery in Databases. Research Track and Demo Track},
+publisher={Springer Nature Switzerland},
+address={Cham},
+pages={306--323},
+year={2024}
+}
+```
 
 ### GPN
 ```
